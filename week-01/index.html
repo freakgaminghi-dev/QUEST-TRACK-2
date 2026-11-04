@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touch Grass</title>
+<style>
+  :root {
+    --bg: #05060f;
+    --panel: rgba(28, 30, 64, 0.85);
+    --text: #f1ecf7;
+    --muted: #b4a8c6;
+    --accent: #6fdc5a;
+    --danger: #ff5a6e;
+    --gold: #ffd34d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+      radial-gradient(1px 1px at 90px 140px, #9fe0ff, transparent),
+      radial-gradient(1.5px 1.5px at 160px 60px, #fff, transparent),
+      radial-gradient(1px 1px at 130px 180px, #ffc4f2, transparent),
+      radial-gradient(ellipse at 20% 0%, rgba(120, 60, 200, 0.35), transparent 60%),
+      radial-gradient(ellipse at 90% 100%, rgba(40, 120, 220, 0.3), transparent 60%);
+    background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 16px 24px;
+    min-height: 100vh;
+  }
+  h1 { margin: 4px 0 8px; font-size: 1.8rem; letter-spacing: 1px; }
+  h1 span { color: var(--accent); text-shadow: 0 0 12px var(--accent); }
+  h1 { text-shadow: 0 0 12px rgba(160, 140, 255, 0.7); }
+  .wrap { width: 100%; max-width: 960px; }
+  .hud {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap;
+    background: var(--panel); border-radius: 10px; padding: 8px 14px; margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .hud b { color: var(--gold); }
+  .sunwrap { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; }
+  .bar { flex: 1; height: 14px; background: #120c1a; border-radius: 7px; overflow: hidden; }
+  .fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ff9b3d, #ffe066); }
+  .fill.low { background: var(--danger); }
+  .stage { position: relative; width: 100%; }
+  canvas { display: block; width: 100%; height: auto; border-radius: 10px; background: #000; box-shadow: 0 0 30px rgba(92, 225, 255, 0.25); }
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(10, 6, 16, 0.84); border-radius: 10px; padding: 16px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 { margin: 0 0 8px; font-size: 2rem; }
+  .overlay p { margin: 4px 0; color: var(--muted); max-width: 520px; }
+  .overlay .big { font-size: 1.25rem; color: var(--text); }
+  button {
+    margin-top: 14px; font: inherit; font-weight: 700; font-size: 1.1rem;
+    background: var(--accent); color: #10200c; border: 0; border-radius: 10px;
+    padding: 10px 26px; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  .howto { background: var(--panel); border-radius: 10px; padding: 10px 16px; margin-top: 10px; }
+  .howto h3 { margin: 4px 0 6px; }
+  .howto ol { margin: 0; padding-left: 20px; line-height: 1.6; }
+  .key { display: inline-block; background: #3a2d50; border-radius: 4px; padding: 0 6px; font-family: monospace; }
+  .pad {
+    display: none; margin: 10px auto 0; width: 200px;
+    grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 60px);
+  }
+  .pad button {
+    margin: 3px; padding: 0; font-size: 1.5rem; background: #3a2d50; color: var(--text);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .pad #dashBtn { font-size: 0.85rem; background: #ff9b3d; color: #2a1400; }
+  @media (pointer: coarse) { .pad { display: grid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Touch <span>Grass</span></h1>
+
+  <div class="hud">
+    <div>Score: <b id="score">0</b></div>
+    <div>Deck: <b id="floor">1</b></div>
+    <div>Space boots: <b id="shoes">no</b></div>
+    <div>Best: <b id="best">0</b></div>
+    <div class="sunwrap">Sunlight <div class="bar"><div class="fill" id="sunFill"></div></div></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="game" width="936" height="576"></canvas>
+
+    <div class="overlay" id="startScreen">
+      <h2>Touch <span style="color:var(--accent)">Grass</span></h2>
+      <p class="big">You haven't left your space station in 1000 days.</p>
+      <p>The station doesn't want you to leave. Find your space boots, get to the airlock and touch the alien grass on the planet before your sunlight runs out.</p>
+      <button id="startBtn">Start</button>
+    </div>
+
+    <div class="overlay hidden" id="deadScreen">
+      <h2 style="color:var(--danger)">You died!</h2>
+      <p class="big" id="deathReason"></p>
+      <p>Final score: <b id="finalScore" style="color:var(--gold)">0</b></p>
+      <p id="newBest"></p>
+      <button id="againBtn">Play Again</button>
+    </div>
+
+    <div class="overlay hidden" id="winScreen">
+      <h2 style="color:var(--accent)">You touched grass!</h2>
+      <p class="big" id="winText"></p>
+      <p>Ahh, alien fresh air... but then you went back in for a snack. The next station deck is harder.</p>
+      <button id="nextBtn">Next Deck</button>
+    </div>
+  </div>
+
+  <div class="pad" id="pad">
+    <span></span><button data-dir="up">▲</button><button id="dashBtn">DASH</button>
+    <button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
+  </div>
+
+  <div class="howto">
+    <h3>How to play</h3>
+    <ol>
+      <li>Move with the <span class="key">Arrow keys</span> or <span class="key">W A S D</span>. Press <span class="key">Space</span> to <b>dash</b>. On a phone, use the buttons.</li>
+      <li>You can't go outside without boots! Find your <b style="color:var(--gold)">space boots</b>, then run to the <b style="color:var(--accent)">airlock</b> and step onto the alien grass.</li>
+      <li>Your <b style="color:#ffb84d">Sunlight</b> drains indoors. Stand in a <b style="color:#ffe066">sunbeam</b> by a window to refill it. If it reaches 0, you die.</li>
+      <li><b style="color:#5ce1ff">TVs</b> pull you in when they're on. Walk past them while the screen is off. <b style="color:#c05a8c">Couches</b> shake, then charge in a straight line, so step out of the way.</li>
+      <li><b style="color:#bbb">Dust bunnies</b> stick to you and slow you down. Dash to shake them off, but 4 of them will bury you. <b style="color:#6fdc5a">Robot vacuums</b> can't be stopped, and toy bricks on the floor hurt to step on.</li>
+      <li>Points: +20 for each new room, +100 for the boots, +5 for each shaken-off bunny, a big bonus for escaping, and extra for escaping fast. If you die, press <b>Play Again</b>.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- map layout ----------
+  const T = 24;                       // pixels per tile
+  const O = 1;                        // house starts after a 1-tile grass ring
+  const RX = 4, RY = 3;               // rooms across / down
+  const RW = 9, RH = 7;               // room pitch (8x6 inside + wall)
+  const HW = RX * RW + 1, HH = RY * RH + 1;
+  const W = HW + 2, H = HH + 2;
+  const FLOOR = 0, WALL = 1, GRASS = 2, WINDOW = 3, FURN = 4;
+  const PR = 0.32;                    // player radius (tiles)
+  const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const ROOM_COLORS = [
+    ['#1d2846', '#1a2440'], ['#271f48', '#231c41'], ['#183244', '#162d3d'],
+    ['#2d1f40', '#291c3a'], ['#1c2c33', '#19282e'], ['#232a3f', '#1f2639']
+  ];
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  let map, roomColor, exitSet, sunCells, shoesItem;
+  let tvs, couches, bunnies, vacuums, bricks;
+  let player, visited;
+  let level = 1, score = 0, time = 0, levelTime = 0, sun = 100, hasShoes = false;
+  let state = 'start', best = 0, message = '', messageT = 0, shake = 0;
+  const held = [];
+
+  try { best = parseInt(localStorage.getItem('touchGrassBest')) || 0; } catch (e) {}
+
+  // ---------- helpers ----------
+  const rand = n => Math.floor(Math.random() * n);
+  const pick = a => a[rand(a.length)];
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const inside = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
+  const tile = (x, y) => inside(x, y) ? map[y][x] : WALL;
+  const isWallLine = (x, y) => (x - O) % RW === 0 || (y - O) % RH === 0;
+  const roomOrigin = (i, j) => [O + i * RW + 1, O + j * RH + 1]; // first interior tile
+  const roomAt = (x, y) => {
+    const i = Math.floor((x - O) / RW), j = Math.floor((y - O) / RH);
+    return (i >= 0 && j >= 0 && i < RX && j < RY) ? [i, j] : null;
+  };
+  const say = (t, s) => { message = t; messageT = s; };
+
+  // ---------- particles ----------
+  const particles = [];
+  const MAX_PARTICLES = 900;
+  // emit n particles at (x, y) in tile units
+  function emit(x, y, n, o = {}) {
+    for (let i = 0; i < n && particles.length < MAX_PARTICLES; i++) {
+      const a = o.angle !== undefined ? o.angle + (Math.random() - 0.5) * (o.spread ?? 0.8) : Math.random() * Math.PI * 2;
+      const sp = (o.speed ?? 1.5) * (0.4 + Math.random() * 0.8);
+      const life = (o.life ?? 0.6) * (0.6 + Math.random() * 0.7);
+      particles.push({
+        x: x + (Math.random() - 0.5) * (o.jitter ?? 0.2), y: y + (Math.random() - 0.5) * (o.jitter ?? 0.2),
+        vx: Math.cos(a) * sp + (o.vx ?? 0), vy: Math.sin(a) * sp + (o.vy ?? 0),
+        life, max: life, size: (o.size ?? 2.5) * (0.6 + Math.random() * 0.8),
+        color: Array.isArray(o.color) ? pick(o.color) : (o.color ?? '#fff'),
+        drag: o.drag ?? 0.92, star: Math.random() < (o.stars ?? 0.3)
+      });
+    }
+  }
+  // emit at a steady rate per second (frame-rate independent)
+  function trail(x, y, rate, dt, o) {
+    const n = rate * dt;
+    emit(x, y, Math.floor(n) + (Math.random() < n % 1 ? 1 : 0), o);
+  }
+  function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const k = Math.pow(p.drag, dt * 60);
+      p.vx *= k; p.vy *= k;
+    }
+  }
+  function drawParticles() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particles) {
+      const a = p.life / p.max, x = p.x * T, y = p.y * T, s = p.size * (0.5 + a * 0.5);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      if (p.star) { // little 4-point sparkle
+        ctx.beginPath();
+        ctx.moveTo(x, y - s * 2); ctx.lineTo(x + s * 0.5, y - s * 0.5); ctx.lineTo(x + s * 2, y);
+        ctx.lineTo(x + s * 0.5, y + s * 0.5); ctx.lineTo(x, y + s * 2); ctx.lineTo(x - s * 0.5, y + s * 0.5);
+        ctx.lineTo(x - s * 2, y); ctx.lineTo(x - s * 0.5, y - s * 0.5); ctx.closePath(); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(x, y, s, 0, 7); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  const SPARKLE = ['#9fe0ff', '#ffc4f2', '#ffe066', '#b9a6ff', '#ffffff'];
+
+  function solidFor(tx, ty, isPlayer) {
+    const t = tile(tx, ty);
+    if (t === WALL || t === WINDOW || t === FURN) return true;
+    if (exitSet.has(tx + ',' + ty)) return isPlayer ? !hasShoes : true;
+    if (t === GRASS) return !isPlayer;
+    return false;
+  }
+
+  function hits(x, y, r, isPlayer) {
+    for (let ty = Math.floor(y - r); ty <= Math.floor(y + r); ty++)
+      for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++)
+        if (solidFor(tx, ty, isPlayer)) return true;
+    return false;
+  }
+
+  // move a circle, sliding along walls. returns true if it bumped into something
+  function moveCircle(e, dx, dy, r, isPlayer) {
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 0.2));
+    let bumped = false;
+    for (let s = 0; s < steps; s++) {
+      const sx = dx / steps, sy = dy / steps;
+      if (!hits(e.x + sx, e.y, r, isPlayer)) e.x += sx; else bumped = true;
+      if (!hits(e.x, e.y + sy, r, isPlayer)) e.y += sy; else bumped = true;
+    }
+    return bumped;
+  }
+
+  function lineOfSight(ax, ay, bx, by) {
+    const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 0.25);
+    for (let i = 1; i < n; i++) {
+      const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n;
+      if (solidFor(Math.floor(x), Math.floor(y), false)) return false;
+    }
+    return true;
+  }
+
+  // ---------- level generation ----------
+  function buildLevel() {
+    map = Array.from({ length: H }, () => new Array(W).fill(GRASS));
+    for (let y = O; y < O + HH; y++) for (let x = O; x < O + HW; x++)
+      map[y][x] = isWallLine(x, y) ? WALL : FLOOR;
+
+    roomColor = Array.from({ length: RY }, () => Array.from({ length: RX }, () => pick(ROOM_COLORS)));
+
+    // connect rooms with 2-wide doorways (random tree + a few extra loops)
+    const linked = new Set();
+    const linkKey = (a, b) => [a, b].sort().join('|');
+    function carveDoor(i, j, ni, nj) {
+      linked.add(linkKey(i + ',' + j, ni + ',' + nj));
+      if (ni !== i) { // left/right neighbour
+        const wx = O + Math.max(i, ni) * RW, r = 1 + rand(3);
+        map[O + j * RH + 1 + r][wx] = FLOOR; map[O + j * RH + 2 + r][wx] = FLOOR;
+      } else {
+        const wy = O + Math.max(j, nj) * RH, r = 1 + rand(5);
+        map[wy][O + i * RW + 1 + r] = FLOOR; map[wy][O + i * RW + 2 + r] = FLOOR;
+      }
+    }
+    const neighbours = (i, j) => Object.values(DIRS).map(([dx, dy]) => [i + dx, j + dy])
+      .filter(([a, b]) => a >= 0 && b >= 0 && a < RX && b < RY);
+    const seen = new Set(['0,0']);
+    const stack = [[0, 0]];
+    while (stack.length) {
+      const [i, j] = stack[stack.length - 1];
+      const opts = shuffle(neighbours(i, j)).filter(([a, b]) => !seen.has(a + ',' + b));
+      if (!opts.length) { stack.pop(); continue; }
+      const [a, b] = opts[0];
+      carveDoor(i, j, a, b); seen.add(a + ',' + b); stack.push([a, b]);
+    }
+    for (let k = 0, extra = 2 + Math.floor(level / 3); k < 40 && extra > 0; k++) {
+      const i = rand(RX), j = rand(RY), [a, b] = pick(neighbours(i, j));
+      if (!linked.has(linkKey(i + ',' + j, a + ',' + b))) { carveDoor(i, j, a, b); extra--; }
+    }
+
+    // start in a corner room; the exit is in the room farthest away
+    const corners = [[0, 0], [RX - 1, 0], [0, RY - 1], [RX - 1, RY - 1]];
+    const start = pick(corners);
+    const dist = {}; dist[start.join(',')] = 0;
+    const q = [start];
+    for (let k = 0; k < q.length; k++) {
+      const [i, j] = q[k];
+      for (const [a, b] of neighbours(i, j)) {
+        const kk = a + ',' + b;
+        if (dist[kk] === undefined && linked.has(linkKey(i + ',' + j, kk))) { dist[kk] = dist[i + ',' + j] + 1; q.push([a, b]); }
+      }
+    }
+    const rooms = [];
+    for (let j = 0; j < RY; j++) for (let i = 0; i < RX; i++) rooms.push({ i, j, d: dist[i + ',' + j] });
+    const maxD = Math.max(...rooms.map(r => r.d));
+    const exitRoom = pick(rooms.filter(r => r.d === maxD));
+
+    // front door on an outside wall of the exit room
+    exitSet = new Set();
+    const sides = [];
+    if (exitRoom.i === 0) sides.push('L');
+    if (exitRoom.i === RX - 1) sides.push('R');
+    if (exitRoom.j === 0) sides.push('U');
+    if (exitRoom.j === RY - 1) sides.push('D');
+    const side = pick(sides);
+    const [eox, eoy] = roomOrigin(exitRoom.i, exitRoom.j);
+    let doorTiles;
+    if (side === 'L' || side === 'R') {
+      const x = side === 'L' ? O : O + HW - 1, y = eoy + 2;
+      doorTiles = [[x, y], [x, y + 1]];
+    } else {
+      const y = side === 'U' ? O : O + HH - 1, x = eox + 3;
+      doorTiles = [[x, y], [x + 1, y]];
+    }
+    for (const [x, y] of doorTiles) { map[y][x] = FLOOR; exitSet.add(x + ',' + y); }
+
+    // tile reservation helpers
+    const used = new Set();
+    const nearDoor = (x, y) => {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+        if (tile(x + dx, y + dy) === FLOOR && isWallLine(x + dx, y + dy)) return true;
+      return false;
+    };
+    function freeTile(room, margin = 0) {
+      const [ox, oy] = roomOrigin(room.i, room.j);
+      for (let k = 0; k < 80; k++) {
+        const x = ox + margin + rand(8 - margin * 2), y = oy + margin + rand(6 - margin * 2);
+        const key = x + ',' + y;
+        if (map[y][x] === FLOOR && !used.has(key) && !nearDoor(x, y)) { used.add(key); return [x, y]; }
+      }
+      return null;
+    }
+
+    // furniture (never in the start room, never next to a doorway)
+    for (const room of rooms) {
+      if (room === rooms.find(r => r.i === start[0] && r.j === start[1])) continue;
+      const [ox, oy] = roomOrigin(room.i, room.j);
+      const n = rand(3);
+      for (let k = 0; k < n; k++) {
+        const horiz = Math.random() < 0.5;
+        const x = ox + 2 + rand(horiz ? 3 : 4), y = oy + 2 + (horiz ? rand(2) : 0);
+        const cells = horiz ? [[x, y], [x + 1, y]] : [[x, y], [x, y + 1]];
+        if (cells.every(([cx, cy]) => map[cy][cx] === FLOOR)) cells.forEach(([cx, cy]) => { map[cy][cx] = FURN; used.add(cx + ',' + cy); });
+      }
+    }
+
+    // windows with sunbeams on outside walls
+    sunCells = [];
+    const winTarget = Math.max(3, 6 - Math.floor((level - 1) / 2));
+    const winRooms = shuffle(rooms.filter(r => r.i === 0 || r.j === 0 || r.i === RX - 1 || r.j === RY - 1));
+    for (const room of winRooms) {
+      if (sunCells.length / 4 >= winTarget) break;
+      if (room.i === start[0] && room.j === start[1] && Math.random() < 0.7) continue;
+      const [ox, oy] = roomOrigin(room.i, room.j);
+      const opts = [];
+      if (room.j === 0) opts.push(['U', ox + 1 + rand(5), O]);
+      if (room.j === RY - 1) opts.push(['D', ox + 1 + rand(5), O + HH - 1]);
+      if (room.i === 0) opts.push(['L', O, oy + 1 + rand(3)]);
+      if (room.i === RX - 1) opts.push(['R', O + HW - 1, oy + 1 + rand(3)]);
+      const [s, wx, wy] = pick(opts);
+      const vert = s === 'L' || s === 'R';
+      const wins = vert ? [[wx, wy], [wx, wy + 1]] : [[wx, wy], [wx + 1, wy]];
+      if (!wins.every(([x, y]) => map[y][x] === WALL)) continue;
+      const inX = s === 'L' ? 1 : s === 'R' ? -1 : 0, inY = s === 'U' ? 1 : s === 'D' ? -1 : 0;
+      const beam = [];
+      for (const [x, y] of wins) for (let d = 1; d <= 2; d++) beam.push([x + inX * d, y + inY * d]);
+      if (!beam.every(([x, y]) => map[y][x] === FLOOR)) continue;
+      wins.forEach(([x, y]) => map[y][x] = WINDOW);
+      beam.forEach(([x, y]) => { sunCells.push({ x, y }); used.add(x + ',' + y); });
+    }
+
+    // player
+    const [sox, soy] = roomOrigin(start[0], start[1]);
+    player = { x: sox + 4, y: soy + 3, face: [1, 0], dashT: 0, dashCd: 0, ouch: 0, step: 0 };
+    used.add((sox + 3) + ',' + (soy + 2)); used.add((sox + 4) + ',' + (soy + 2));
+    used.add((sox + 3) + ',' + (soy + 3)); used.add((sox + 4) + ',' + (soy + 3));
+    visited = new Set([start.join(',')]);
+
+    // shoes: in a room at least halfway across the house (not the exit room)
+    let shoeRooms = rooms.filter(r => r.d >= Math.ceil(maxD / 2) && r !== exitRoom);
+    if (!shoeRooms.length) shoeRooms = rooms.filter(r => r.d > 0 && r !== exitRoom);
+    const st = freeTile(pick(shoeRooms), 1) || freeTile(exitRoom, 1);
+    shoesItem = { x: st[0] + 0.5, y: st[1] + 0.5 };
+
+    // house hazards
+    tvs = []; couches = []; bunnies = []; vacuums = []; bricks = [];
+    const types = ['tv', 'bunnies', 'bricks'];
+    if (level >= 2) types.push('couch', 'vacuum');
+    if (level >= 3) types.push('tv', 'couch');
+    for (const room of rooms) {
+      if (room.d === 0) continue;
+      let n = level === 1 ? (Math.random() < 0.75 ? 1 : 0) : 1 + (Math.random() < Math.min(0.85, (level - 1) * 0.25) ? 1 : 0);
+      if (level >= 5 && Math.random() < 0.3) n++;
+      if (room === exitRoom) n = Math.max(n, 1);
+      for (let k = 0; k < n; k++) placeHazard(pick(types), room);
+    }
+
+    function placeHazard(type, room) {
+      const [ox, oy] = roomOrigin(room.i, room.j);
+      if (type === 'tv') {
+        const top = Math.random() < 0.5;
+        const y = top ? oy : oy + 5, x = ox + 2 + rand(4);
+        if (map[top ? y - 1 : y + 1][x] !== WALL || used.has(x + ',' + y) || nearDoor(x, y)) return;
+        used.add(x + ',' + y);
+        tvs.push({ x: x + 0.5, y: y + (top ? 0.25 : 0.75), period: 4.2 - Math.min(1, level * 0.1), phase: Math.random() * 4, wall: top ? -1 : 1 });
+      } else if (type === 'couch') {
+        const t = freeTile(room, 1); if (!t) return;
+        couches.push({ x: t[0] + 0.5, y: t[1] + 0.5, mode: 'idle', timer: 0, vx: 0, vy: 0 });
+      } else if (type === 'vacuum') {
+        const t = freeTile(room); if (!t) return;
+        const a = Math.random() * Math.PI * 2;
+        vacuums.push({ x: t[0] + 0.5, y: t[1] + 0.5, a, speed: 2.2 + level * 0.15, spin: 0 });
+      } else if (type === 'bunnies') {
+        for (let b = 0; b < 3; b++) {
+          const t = freeTile(room); if (!t) continue;
+          bunnies.push({ x: t[0] + 0.5, y: t[1] + 0.5, mode: 'idle', ang: 0, vx: 0, vy: 0, stun: 0, hop: Math.random() * 6 });
+        }
+      } else {
+        const count = 3 + Math.floor(level / 2);
+        for (let b = 0; b < count; b++) {
+          const t = freeTile(room); if (!t) continue;
+          bricks.push({ x: t[0] + 0.2 + Math.random() * 0.6, y: t[1] + 0.2 + Math.random() * 0.6, c: pick(['#ff5a6e', '#4da3ff', '#ffd34d', '#6fdc5a']), r: Math.random() * 3 });
+        }
+      }
+    }
+
+    levelTime = 0; sun = 100; hasShoes = false; shake = 0; particles.length = 0;
+    say("You can't go outside without your space boots! Find them.", 3.5);
+  }
+
+  // ---------- hazards ----------
+  const tvOn = tv => ((time + tv.phase) % tv.period) < tv.period * 0.62;
+  const tvWarming = tv => { const t = (time + tv.phase) % tv.period; return t > tv.period - 0.5; };
+
+  function updateTVs(dt) {
+    const strength = Math.min(4.2, 3.3 + level * 0.1), R = 4.5;
+    for (const tv of tvs) {
+      if (!tvOn(tv)) continue;
+      const dx = tv.x - player.x, dy = tv.y - player.y, d = Math.hypot(dx, dy);
+      if (d < 0.65) return 'The TV sucked you in. "Just one more episode..."';
+      { // glowing bits get sucked into the screen
+        const a = Math.random() * Math.PI * 2, rr2 = 1.5 + Math.random() * 2.5;
+        if (Math.random() < dt * 25) emit(tv.x + Math.cos(a) * rr2, tv.y + Math.sin(a) * rr2, 1,
+          { angle: a + Math.PI, spread: 0.1, speed: rr2 * 1.6, life: 0.6, color: ['#5ce1ff', '#b9f3ff'], drag: 1, size: 2, jitter: 0 });
+      }
+      if (d < R && lineOfSight(player.x, player.y, tv.x, tv.y - tv.wall * 0.4)) {
+        const f = strength * (1 - d / R) + 0.6;
+        moveCircle(player, dx / d * f * dt, dy / d * f * dt, PR, true);
+      }
+    }
+    return null;
+  }
+
+  function updateCouches(dt) {
+    for (const c of couches) {
+      const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy);
+      c.timer -= dt;
+      if (c.mode === 'idle') {
+        if (d < 6.5 && lineOfSight(c.x, c.y, player.x, player.y)) { c.mode = 'windup'; c.timer = Math.max(0.4, 0.75 - level * 0.03); }
+      } else if (c.mode === 'windup') {
+        trail(c.x, c.y, 30, dt, { speed: 2, life: 0.4, color: ['#ffd34d', '#ff8ac8'], size: 2 });
+        if (c.timer <= 0) {
+          const s = 9 + level * 0.3;
+          c.vx = dx / d * s; c.vy = dy / d * s; c.mode = 'charge'; c.timer = 1.2;
+        }
+      } else if (c.mode === 'charge') {
+        const bumped = moveCircle(c, c.vx * dt, c.vy * dt, 0.45, false);
+        trail(c.x, c.y, 70, dt, { angle: Math.atan2(-c.vy, -c.vx), spread: 1.2, speed: 3, life: 0.5, color: ['#ff5ab4', '#c05a8c', '#ffc4f2'], size: 3, jitter: 0.6 });
+        if (bumped || c.timer <= 0) {
+          c.mode = 'rest'; c.timer = 1.4;
+          if (bumped) { shake = 0.25; emit(c.x, c.y, 30, { speed: 4, life: 0.7, color: ['#ffd34d', '#ff5ab4', '#fff'], size: 3, stars: 0.6 }); }
+        }
+      } else if (c.mode === 'rest' && c.timer <= 0) c.mode = 'idle';
+      if (d < 0.75) return 'The Couch Chomper swallowed you. So comfy... forever.';
+    }
+    return null;
+  }
+
+  function updateVacuums(dt) {
+    for (const v of vacuums) {
+      v.spin += dt * 10;
+      trail(v.x - Math.cos(v.a) * 0.4, v.y - Math.sin(v.a) * 0.4, 18, dt,
+        { angle: v.a + Math.PI, spread: 0.9, speed: 1.2, life: 0.7, color: ['#6dffb0', '#3cff8a', '#b6ffd8'], size: 2 });
+      if (moveCircle(v, Math.cos(v.a) * v.speed * dt, Math.sin(v.a) * v.speed * dt, 0.4, false))
+        v.a += Math.PI / 2 + Math.random() * Math.PI;
+      if (Math.random() < dt * 0.3) v.a += (Math.random() - 0.5) * 1.5;
+      if (Math.hypot(v.x - player.x, v.y - player.y) < 0.7) return 'A Robo-Vacuum hoovered you up!';
+    }
+    return null;
+  }
+
+  function attachedCount() { return bunnies.filter(b => b.mode === 'stuck').length; }
+
+  function updateBunnies(dt) {
+    for (const b of bunnies) {
+      b.hop += dt * 8;
+      if (b.mode === 'stuck') {
+        b.ang += dt * 2;
+        b.x = player.x + Math.cos(b.ang) * 0.42; b.y = player.y + Math.sin(b.ang) * 0.42;
+        continue;
+      }
+      if (b.mode === 'flung') {
+        moveCircle(b, b.vx * dt, b.vy * dt, 0.2, false);
+        trail(b.x, b.y, 25, dt, { speed: 0.6, life: 0.5, color: ['#b9a6ff', '#ddd'], size: 2 });
+        b.vx *= 0.9; b.vy *= 0.9; b.stun -= dt;
+        if (b.stun <= 0) b.mode = 'idle';
+        continue;
+      }
+      const dx = player.x - b.x, dy = player.y - b.y, d = Math.hypot(dx, dy);
+      if (d < 5 && lineOfSight(b.x, b.y, player.x, player.y)) {
+        const s = 2.6 + level * 0.12;
+        moveCircle(b, dx / d * s * dt, dy / d * s * dt, 0.2, false);
+        trail(b.x, b.y + 0.15, 10, dt, { speed: 0.5, life: 0.6, color: ['#b9a6ff', '#cfc8e0'], size: 1.8, stars: 0 });
+      } else {
+        moveCircle(b, Math.sin(b.hop * 0.3) * 0.3 * dt, Math.cos(b.hop * 0.4) * 0.3 * dt, 0.2, false);
+      }
+      if (d < PR + 0.28) {
+        b.mode = 'stuck'; b.ang = Math.atan2(-dy, -dx);
+        const n = attachedCount();
+        say(n >= 3 ? 'DASH! One more and you are buried!' : `A dust bunny stuck to you! (${n}/4)`, 1.5);
+        if (n >= 4) return 'Buried alive in dust bunnies! Dash to shake them off.';
+      }
+    }
+    return null;
+  }
+
+  function dash() {
+    if (state !== 'play' || player.dashCd > 0) return;
+    player.dashT = 0.17; player.dashCd = 0.7;
+    sun -= 4;
+    emit(player.x, player.y, 26, { angle: Math.atan2(-player.face[1], -player.face[0]), spread: 1.6, speed: 5, life: 0.6, color: ['#ffb84d', '#ffe066', '#ff8ac8'], size: 3, stars: 0.5 });
+    let flung = 0;
+    for (const b of bunnies) if (b.mode === 'stuck') {
+      b.mode = 'flung'; b.stun = 1.6;
+      b.vx = Math.cos(b.ang) * 9; b.vy = Math.sin(b.ang) * 9; flung++;
+    }
+    if (flung) { score += 5 * flung; say(`Shook off ${flung} dust bunn${flung > 1 ? 'ies' : 'y'}!`, 1.3); }
+  }
+
+  // ---------- player ----------
+  function inputDir() {
+    let x = 0, y = 0;
+    for (const d of held) { x += DIRS[d][0]; y += DIRS[d][1]; }
+    const l = Math.hypot(x, y);
+    return l ? [x / l, y / l] : [0, 0];
+  }
+
+  function updatePlayer(dt) {
+    player.dashCd -= dt;
+    if (player.ouch > 0) { player.ouch -= dt; return; }
+    const [ix, iy] = inputDir();
+    if (ix || iy) player.face = [ix, iy];
+    let vx, vy;
+    if (player.dashT > 0) {
+      player.dashT -= dt;
+      vx = player.face[0] * 13; vy = player.face[1] * 13;
+    } else {
+      const slow = Math.max(0.35, 1 - 0.17 * attachedCount());
+      const sp = 4.8 * slow;
+      vx = ix * sp; vy = iy * sp;
+    }
+    if (vx || vy) {
+      player.step += dt;
+      if (player.dashT > 0) trail(player.x, player.y, 120, dt, { speed: 0.8, life: 0.45, color: ['#ffb84d', '#ffe066'], size: 3 });
+      else trail(player.x, player.y + 0.3, 22, dt, { angle: Math.atan2(-vy, -vx), spread: 1.4, speed: 1, life: 0.7, color: SPARKLE, size: 2 });
+    }
+    moveCircle(player, vx * dt, vy * dt, PR, true);
+
+    // bumping into the locked front door
+    if (!hasShoes && (ix || iy)) {
+      const fx = Math.floor(player.x + ix * 0.6), fy = Math.floor(player.y + iy * 0.6);
+      if (exitSet.has(fx + ',' + fy) && messageT <= 0) say('Airlock locked! Find your space boots first.', 1.6);
+    }
+  }
+
+  // ---------- game flow ----------
+  function update(dt) {
+    time += dt;
+    updateParticles(dt);
+    if (shake > 0) shake -= dt;
+    if (state !== 'play') return;
+    levelTime += dt;
+    if (messageT > 0) messageT -= dt;
+
+    updatePlayer(dt);
+
+    const cause = updateTVs(dt) || updateCouches(dt) || updateVacuums(dt) || updateBunnies(dt);
+    if (cause) return die(cause);
+
+    // toy bricks
+    for (let i = bricks.length - 1; i >= 0; i--) {
+      const b = bricks[i];
+      if (Math.hypot(b.x - player.x, b.y - player.y) < 0.4) {
+        bricks.splice(i, 1);
+        player.ouch = 0.7; sun -= 12; shake = 0.2;
+        emit(b.x, b.y, 18, { speed: 3, life: 0.5, color: [b.c, '#fff'], size: 2.5, stars: 0.6 });
+        say('OUCH! You stepped on a toy brick!', 1.4);
+      }
+    }
+
+    // shoes
+    if (!hasShoes && Math.hypot(shoesItem.x - player.x, shoesItem.y - player.y) < 0.6) {
+      hasShoes = true; score += 100;
+      emit(shoesItem.x, shoesItem.y, 40, { speed: 4, life: 0.9, color: ['#ffd34d', '#fff', '#ffe066'], size: 3, stars: 0.8 }); say('Boots on! Now get to the airlock!', 2.5);
+    }
+
+    // new rooms explored
+    const r = roomAt(player.x, player.y);
+    if (r && !visited.has(r.join(','))) { visited.add(r.join(',')); score += 20; }
+
+    // sunlight
+    const tx = Math.floor(player.x), ty = Math.floor(player.y);
+    const inSun = sunCells.some(s => s.x === tx && s.y === ty);
+    if (inSun) {
+      sun = Math.min(100, sun + 40 * dt);
+      trail(player.x, player.y, 14, dt, { angle: -Math.PI / 2, spread: 1, speed: 1.2, life: 0.8, color: ['#ffe066', '#fff3b0'], size: 2, stars: 0.6 });
+    }
+    else sun -= (2.0 + level * 0.15) * dt;
+    if (sun <= 0) { sun = 0; return die('You stayed inside too long and withered away. Find the sunbeams!'); }
+
+    if (tile(tx, ty) === GRASS) return win();
+    updateHud();
+  }
+
+  function updateHud() {
+    $('score').textContent = score;
+    $('floor').textContent = level;
+    $('shoes').textContent = hasShoes ? 'ON' : 'no';
+    $('best').textContent = Math.max(best, score);
+    $('sunFill').style.width = Math.max(0, sun) + '%';
+    $('sunFill').classList.toggle('low', sun < 30);
+  }
+
+  function show(id) {
+    for (const s of ['startScreen', 'deadScreen', 'winScreen']) $(s).classList.toggle('hidden', s !== id);
+  }
+
+  function die(reason) {
+    state = 'dead'; shake = 0.4;
+    emit(player.x, player.y, 60, { speed: 5, life: 1, color: ['#ff5a6e', '#ff8ac8', '#fff'], size: 3, stars: 0.5 });
+    $('deathReason').textContent = reason;
+    $('finalScore').textContent = score;
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('touchGrassBest', best); } catch (e) {}
+      $('newBest').textContent = 'New best score!';
+    } else $('newBest').textContent = 'Best: ' + best;
+    updateHud();
+    setTimeout(() => { if (state === 'dead') { show('deadScreen'); $('againBtn').focus(); } }, 700);
+  }
+
+  function win() {
+    state = 'win';
+    emit(player.x, player.y, 80, { speed: 6, life: 1.2, color: ['#6dffb0', '#ffe066', '#ff8ac8', '#9fe0ff'], size: 3.5, stars: 0.7 });
+    const escape = 150 * level;
+    const bonus = Math.max(0, Math.round((60 - levelTime) * 3));
+    score += escape + bonus;
+    $('winText').textContent = `+${escape} escape points, +${bonus} speed bonus (${levelTime.toFixed(1)}s)`;
+    updateHud(); show('winScreen'); $('nextBtn').focus();
+  }
+
+  function startGame() { level = 1; score = 0; buildLevel(); state = 'play'; show(null); updateHud(); }
+  function nextLevel() { level++; buildLevel(); state = 'play'; show(null); updateHud(); }
+
+  // ---------- drawing ----------
+  function rr(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawTile(x, y) {
+    const t = map[y][x], px = x * T, py = y * T;
+    const seed = x * 7 + y * 13;
+    if (t === GRASS) { // alien planet grass
+      ctx.fillStyle = (x + y) % 2 ? '#1f8f5a' : '#23995f'; ctx.fillRect(px, py, T, T);
+      ctx.strokeStyle = '#6dffb0'; ctx.lineWidth = 2;
+      for (let i = 0; i < 2; i++) {
+        const bx = px + 5 + ((seed + i * 11) % 14), by = py + 8 + ((seed * 3 + i * 7) % 10);
+        ctx.beginPath(); ctx.moveTo(bx, by + 6); ctx.lineTo(bx + Math.sin(time * 2 + seed + i) * 2, by); ctx.stroke();
+      }
+      if (seed % 9 === 0) { // glowing alien flower
+        ctx.fillStyle = `rgba(255,140,230,${0.6 + Math.sin(time * 3 + seed) * 0.3})`;
+        ctx.beginPath(); ctx.arc(px + 12, py + 12, 2.5, 0, 7); ctx.fill();
+      }
+    } else if (t === WALL || t === WINDOW) {
+      ctx.fillStyle = '#0b0f20'; ctx.fillRect(px, py, T, T);
+      ctx.fillStyle = '#26304f'; ctx.fillRect(px + 1, py + 1, T - 2, T - 2);
+      ctx.fillStyle = '#323e63'; ctx.fillRect(px + 3, py + 3, T - 6, T - 6);
+      ctx.fillStyle = `rgba(92,225,255,${0.35 + Math.sin(time * 2 + seed * 0.3) * 0.2})`;
+      ctx.fillRect(px + 3, py + T / 2 - 1, T - 6, 2); // neon strip
+      if (t === WINDOW) { // porthole into space
+        ctx.fillStyle = '#9aa6c8'; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, 10, 0, 7); ctx.fill();
+        ctx.fillStyle = '#02030c'; ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, 8, 0, 7); ctx.fill();
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = `rgba(255,255,255,${0.5 + Math.sin(time * 4 + seed + i * 2) * 0.5})`;
+          ctx.fillRect(px + 8 + ((seed + i * 5) % 8), py + 8 + ((seed * 2 + i * 3) % 8), 1.5, 1.5);
+        }
+      }
+    } else {
+      const r = roomAt(x, y);
+      const pal = r && !isWallLine(x, y) ? roomColor[r[1]][r[0]] : ['#1a1e30', '#1a1e30'];
+      ctx.fillStyle = pal[(x + y) % 2]; ctx.fillRect(px, py, T, T);
+      ctx.strokeStyle = 'rgba(120,200,255,0.10)'; ctx.lineWidth = 1; // metal floor grid
+      ctx.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1);
+      ctx.fillStyle = 'rgba(180,210,255,0.18)';
+      ctx.fillRect(px + 2, py + 2, 1.5, 1.5); ctx.fillRect(px + T - 4, py + T - 4, 1.5, 1.5);
+      if (t === FURN) { // cargo crate / control console
+        ctx.fillStyle = '#121729'; rr(px + 1, py + 1, T - 2, T - 2, 3); ctx.fill();
+        ctx.fillStyle = '#4a587f'; rr(px + 2, py + 2, T - 4, T - 6, 3); ctx.fill();
+        ctx.fillStyle = '#ffb84d'; ctx.fillRect(px + 4, py + 6, T - 8, 2);
+        ctx.fillStyle = Math.sin(time * 3 + seed) > 0 ? '#ff5a6e' : '#6dffb0';
+        ctx.beginPath(); ctx.arc(px + T - 7, py + T - 9, 2, 0, 7); ctx.fill();
+      }
+    }
+  }
+
+  function drawSun() {
+    for (const s of sunCells) {
+      const a = 0.32 + Math.sin(time * 3 + s.x + s.y) * 0.08;
+      ctx.fillStyle = `rgba(255,224,102,${a})`; ctx.fillRect(s.x * T, s.y * T, T, T);
+      ctx.fillStyle = `rgba(255,250,200,${a})`;
+      const o = (time * 8 + s.x * 5 + s.y * 3) % T;
+      ctx.fillRect(s.x * T + o, s.y * T + 4, 2, 2);
+    }
+  }
+
+  function drawDoor() {
+    for (const k of exitSet) {
+      const [x, y] = k.split(',').map(Number), px = x * T, py = y * T;
+      if (hasShoes) {
+        ctx.fillStyle = `rgba(111,220,90,${0.45 + Math.sin(time * 6) * 0.25})`; ctx.fillRect(px, py, T, T);
+      } else { // locked airlock hatch with warning stripes
+        ctx.fillStyle = '#3a3f55'; ctx.fillRect(px, py, T, T);
+        ctx.save(); ctx.beginPath(); ctx.rect(px + 2, py + 2, T - 4, T - 4); ctx.clip();
+        for (let i = -T; i < T * 2; i += 8) {
+          ctx.fillStyle = '#ffd34d'; ctx.beginPath();
+          ctx.moveTo(px + i, py); ctx.lineTo(px + i + 4, py); ctx.lineTo(px + i + 4 - T, py + T); ctx.lineTo(px + i - T, py + T); ctx.fill();
+        }
+        ctx.restore();
+        ctx.fillStyle = Math.sin(time * 5) > 0 ? '#ff3355' : '#661122';
+        ctx.beginPath(); ctx.arc(px + T / 2, py + T / 2, 3, 0, 7); ctx.fill();
+      }
+    }
+  }
+
+  function drawShoes() {
+    if (hasShoes) return;
+    const x = shoesItem.x * T, y = shoesItem.y * T + Math.sin(time * 4) * 2;
+    ctx.fillStyle = `rgba(255,211,77,${0.25 + Math.sin(time * 5) * 0.15})`;
+    ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.fill();
+    for (const ox of [-6, 2]) {
+      ctx.fillStyle = '#e84a5f'; rr(x + ox - 2, y - 5, 8, 9, 3); ctx.fill();
+      ctx.fillRect(x + ox - 2, y + 1, 11, 4);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x + ox - 2, y + 4, 11, 2);
+    }
+  }
+
+  function drawBricks() {
+    for (const b of bricks) {
+      ctx.save(); ctx.translate(b.x * T, b.y * T); ctx.rotate(b.r);
+      ctx.fillStyle = b.c; ctx.fillRect(-6, -4, 12, 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.arc(-3, 0, 1.8, 0, 7); ctx.arc(3, 0, 1.8, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawTVs() {
+    for (const tv of tvs) {
+      const x = tv.x * T, y = tv.y * T, on = tvOn(tv), warm = !on && tvWarming(tv);
+      if (on) { // pull rings shrinking toward the TV
+        ctx.strokeStyle = 'rgba(92,225,255,0.35)'; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const r = ((1 - ((time * 0.8 + i / 3) % 1)) * 4.5) * T;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+        }
+        const g = ctx.createRadialGradient(x, y, 0, x, y, T * 3);
+        g.addColorStop(0, 'rgba(92,225,255,0.35)'); g.addColorStop(1, 'rgba(92,225,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, T * 3, 0, 7); ctx.fill();
+      }
+      ctx.fillStyle = '#111'; rr(x - 15, y - 11, 30, 22, 3); ctx.fill();
+      if (on) {
+        ctx.fillStyle = '#5ce1ff'; ctx.fillRect(x - 12, y - 8, 24, 16);
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        for (let i = 0; i < 6; i++) ctx.fillRect(x - 12 + rand(22), y - 8 + rand(14), 3, 1);
+        ctx.fillStyle = '#10303a'; // creepy face
+        ctx.fillRect(x - 7, y - 4, 4, 4); ctx.fillRect(x + 3, y - 4, 4, 4); ctx.fillRect(x - 5, y + 2, 10, 2);
+      } else {
+        ctx.fillStyle = warm && Math.sin(time * 40) > 0 ? '#3a6a77' : '#1d2a33';
+        ctx.fillRect(x - 12, y - 8, 24, 16);
+      }
+    }
+  }
+
+  function drawCouches() {
+    for (const c of couches) {
+      let x = c.x * T, y = c.y * T;
+      if (c.mode === 'windup') { x += Math.sin(time * 60) * 2; }
+      const angry = c.mode !== 'idle' && c.mode !== 'rest';
+      ctx.fillStyle = '#7a2f55'; rr(x - 15, y - 12, 30, 24, 6); ctx.fill();
+      ctx.fillStyle = '#c05a8c'; rr(x - 12, y - 6, 11, 13, 3); ctx.fill(); rr(x + 1, y - 6, 11, 13, 3); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(x - 6, y - 8, 3.5, 0, 7); ctx.arc(x + 6, y - 8, 3.5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a1030';
+      const lx = Math.sign(player.x - c.x) * 1.5, ly = Math.sign(player.y - c.y) * 1.5;
+      ctx.beginPath(); ctx.arc(x - 6 + lx, y - 8 + ly, 1.8, 0, 7); ctx.arc(x + 6 + lx, y - 8 + ly, 1.8, 0, 7); ctx.fill();
+      if (angry) {
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(x - 10 + i * 5, y + 7); ctx.lineTo(x - 7.5 + i * 5, y + 12); ctx.lineTo(x - 5 + i * 5, y + 7); ctx.fill(); }
+      }
+      if (c.mode === 'windup') {
+        ctx.fillStyle = '#ffd34d'; ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('!', x, y - 16);
+      }
+      if (c.mode === 'rest') {
+        ctx.fillStyle = '#ddd'; ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('z', x + 12, y - 14 - Math.sin(time * 3) * 2);
+      }
+    }
+  }
+
+  function drawVacuums() {
+    for (const v of vacuums) {
+      const x = v.x * T, y = v.y * T;
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x, y, 10, 0, 7); ctx.fill();
+      ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#999'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const a = v.spin + i * 2.1;
+        ctx.beginPath(); ctx.moveTo(x + Math.cos(v.a) * 9, y + Math.sin(v.a) * 9);
+        ctx.lineTo(x + Math.cos(v.a) * 9 + Math.cos(a) * 5, y + Math.sin(v.a) * 9 + Math.sin(a) * 5); ctx.stroke();
+      }
+      ctx.fillStyle = Math.sin(time * 6) > 0 ? '#6fdc5a' : '#2f6a28';
+      ctx.beginPath(); ctx.arc(x + Math.cos(v.a) * 3, y + Math.sin(v.a) * 3, 2.5, 0, 7); ctx.fill();
+    }
+  }
+
+  function drawBunnies() {
+    for (const b of bunnies) {
+      const x = b.x * T, y = b.y * T - Math.abs(Math.sin(b.hop)) * (b.mode === 'stuck' ? 0 : 3);
+      ctx.fillStyle = b.mode === 'flung' ? '#888' : '#b9b4c4';
+      for (let i = 0; i < 6; i++) { const a = i * 1.05 + b.hop * 0.2; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 4, y + Math.sin(a) * 4, 4, 0, 7); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#1a1030';
+      if (b.mode === 'flung') { ctx.fillRect(x - 4, y - 1, 3, 1); ctx.fillRect(x + 1, y - 1, 3, 1); }
+      else { ctx.beginPath(); ctx.arc(x - 2, y - 1, 1.3, 0, 7); ctx.arc(x + 2, y - 1, 1.3, 0, 7); ctx.fill(); }
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x * T, y = player.y * T, dead = state === 'dead';
+    const bounce = Math.abs(Math.sin(player.step * 14)) * 2;
+    if (player.dashT > 0) {
+      ctx.fillStyle = 'rgba(255,184,77,0.35)';
+      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(x - player.face[0] * i * 6, y - player.face[1] * i * 6, 8, 0, 7); ctx.fill(); }
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, y + 8, 7, 2.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = dead ? '#888' : (player.ouch > 0 ? '#ff8a8a' : '#f2d6c2'); // very pale indoor skin
+    ctx.beginPath(); ctx.arc(x, y - bounce, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3b2a1e';
+    ctx.beginPath(); ctx.arc(x, y - 3 - bounce, 7.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+    if (hasShoes) { ctx.fillStyle = '#e84a5f'; ctx.fillRect(x - 6, y + 6, 4, 3); ctx.fillRect(x + 2, y + 6, 4, 3); }
+    ctx.fillStyle = '#1a1030';
+    const fx = player.face[0] * 1.5, fy = player.face[1] * 1;
+    if (dead) {
+      ctx.strokeStyle = '#1a1030'; ctx.lineWidth = 1.5;
+      for (const ex of [-3, 3]) { ctx.beginPath(); ctx.moveTo(x + ex - 1.5, y - 3); ctx.lineTo(x + ex + 1.5, y); ctx.moveTo(x + ex + 1.5, y - 3); ctx.lineTo(x + ex - 1.5, y); ctx.stroke(); }
+    } else {
+      ctx.beginPath(); ctx.arc(x - 3 + fx, y - 1 + fy - bounce, 1.5, 0, 7); ctx.arc(x + 3 + fx, y - 1 + fy - bounce, 1.5, 0, 7); ctx.fill();
+    }
+  }
+
+  function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) drawTile(x, y);
+    drawDoor(); drawSun(); drawBricks(); drawShoes();
+    drawTVs(); drawVacuums(); drawCouches(); drawBunnies(); drawPlayer();
+
+    // the less sunlight, the less you can see
+    const px = player.x * T, py = player.y * T;
+    const r = T * (2.2 + 3 * Math.max(0, sun) / 100);
+    const g = ctx.createRadialGradient(px, py, r, px, py, r + T * 5);
+    g.addColorStop(0, 'rgba(8,4,14,0)'); g.addColorStop(1, 'rgba(8,4,14,0.88)');
+    ctx.fillStyle = g; ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
+    drawParticles();
+    ctx.restore();
+
+    if (state === 'play' && messageT > 0) {
+      ctx.font = 'bold 18px system-ui, sans-serif'; ctx.textAlign = 'center';
+      const w = ctx.measureText(message).width + 28;
+      ctx.fillStyle = 'rgba(10,6,16,0.8)'; ctx.fillRect(canvas.width / 2 - w / 2, 8, w, 30);
+      ctx.fillStyle = '#fff'; ctx.fillText(message, canvas.width / 2, 29);
+    }
+    if (state === 'play' && sun < 30 && Math.sin(time * 8) > 0) {
+      ctx.fillStyle = 'rgba(255,90,110,0.12)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    if (state === 'dead') { ctx.fillStyle = 'rgba(255,40,60,0.25)'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  }
+
+  // ---------- input ----------
+  const KEYMAP = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right'
+  };
+  const press = d => { if (!held.includes(d)) held.push(d); };
+  const release = d => { const i = held.indexOf(d); if (i >= 0) held.splice(i, 1); };
+
+  window.addEventListener('keydown', e => {
+    const d = KEYMAP[e.key];
+    if (d) { e.preventDefault(); press(d); return; }
+    if (e.key === ' ' && state === 'play') { e.preventDefault(); if (!e.repeat) dash(); return; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (state === 'start' || state === 'dead') { e.preventDefault(); startGame(); }
+      else if (state === 'win') { e.preventDefault(); nextLevel(); }
+    }
+  });
+  window.addEventListener('keyup', e => { const d = KEYMAP[e.key]; if (d) release(d); });
+  window.addEventListener('blur', () => { held.length = 0; });
+
+  document.querySelectorAll('#pad button[data-dir]').forEach(b => {
+    const d = b.dataset.dir;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); press(d); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => release(d)));
+  });
+  $('dashBtn').addEventListener('pointerdown', e => { e.preventDefault(); dash(); });
+  $('startBtn').onclick = startGame;
+  $('againBtn').onclick = startGame;
+  $('nextBtn').onclick = nextLevel;
+
+  // ---------- loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  buildLevel();
+  updateHud();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
