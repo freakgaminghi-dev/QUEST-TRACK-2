@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speed Smash Range</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #9fd0ff; color: #fff;
+    font-family: "Fredoka", "Segoe UI", Arial, sans-serif;
+    overflow: hidden; height: 100vh; user-select: none;
+  }
+  canvas { display: block; }
+
+  .panel {
+    background: rgba(12, 14, 28, 0.62);
+    backdrop-filter: blur(6px);
+    border: 2px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .game-ui { transition: opacity 0.3s; }
+  body.menu .game-ui { opacity: 0; pointer-events: none !important; }
+
+  #stats {
+    position: fixed; top: 12px; left: 12px;
+    padding: 10px 16px; font-size: 15px; line-height: 1.6;
+    pointer-events: none; min-width: 180px;
+  }
+  #stats .row { display: flex; justify-content: space-between; gap: 18px; }
+  #stats b { color: #ffd93b; }
+  #stats .score { font-size: 20px; }
+
+  #timer {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    padding: 6px 26px 8px; text-align: center; pointer-events: none; border-color: #ffd93b;
+  }
+  #timer small { display: block; font-size: 13px; color: #ffd93b; letter-spacing: 2px; }
+  #timeLeft { font-size: 34px; font-weight: 700; }
+
+  #bossBar {
+    position: fixed; top: 92px; left: 50%; transform: translateX(-50%);
+    width: min(420px, calc(100vw - 32px)); padding: 6px 12px 8px;
+    pointer-events: none; text-align: center; border-color: #ff5a1f;
+  }
+  #bossBar .name { font-size: 14px; font-weight: 700; color: #ffb38a; letter-spacing: 1px; }
+  #bossBar .bar { height: 16px; margin-top: 4px; }
+  #bossFill { background: linear-gradient(90deg, #ff3b3b, #ff9a1f); }
+
+  #radar {
+    position: fixed; top: 12px; right: 12px; width: 160px; height: 160px;
+    border-radius: 50%; pointer-events: none;
+    background: rgba(12, 14, 28, 0.62); border: 2px solid rgba(255,255,255,0.2);
+  }
+
+  #bottom {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: min(460px, calc(100vw - 32px));
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  #timing { padding: 8px 14px 10px; }
+  #timing .tlabel { font-size: 13px; margin-bottom: 5px; display: flex; justify-content: space-between; }
+  #timing .tlabel b { color: #ffd93b; }
+  #track { position: relative; height: 18px; background: rgba(0,0,0,0.5); border-radius: 9px; overflow: hidden; }
+  #goodZone { position: absolute; left: 34%; width: 32%; top: 0; bottom: 0; background: rgba(59, 213, 255, 0.45); }
+  #perfectZone { position: absolute; left: 44%; width: 12%; top: 0; bottom: 0; background: #ffd93b; box-shadow: 0 0 10px #ffd93b; }
+  #marker { position: absolute; top: -2px; bottom: -2px; width: 5px; margin-left: -2px; background: #fff; border-radius: 3px; box-shadow: 0 0 8px #fff; }
+  #timingResult { font-weight: 700; }
+
+  #bars { padding: 10px 16px; font-size: 14px; }
+  .barRow { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .barRow .label { width: 66px; font-weight: 700; }
+  .barRow .num { width: 40px; text-align: right; font-weight: 700; color: #ffd93b; }
+  .bar { flex: 1; height: 14px; background: rgba(0, 0, 0, 0.45); border-radius: 8px; overflow: hidden; }
+  .fill { height: 100%; width: 100%; border-radius: 8px; }
+  #dashFill { background: linear-gradient(90deg, #c03bff, #ff7af5); }
+  #atkFill { background: linear-gradient(90deg, #ff8c3b, #ffd93b); }
+  #boostFill { background: linear-gradient(90deg, #1f6fff, #3bf0ff); }
+  #jumpDots { display: flex; gap: 6px; flex: 1; }
+  .jdot { width: 28px; height: 12px; border-radius: 6px; background: #7dff9f; box-shadow: 0 0 6px #7dff9f; }
+  .jdot.used { background: rgba(255,255,255,0.15); box-shadow: none; }
+
+  #rightSide {
+    position: fixed; bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  }
+  #boostBtn {
+    font-family: inherit; font-size: 20px; font-weight: 700; color: #fff;
+    width: 150px; padding: 14px 0; border-radius: 16px; cursor: pointer;
+    background: linear-gradient(#3bb4ff, #1f5fff); border: 3px solid #bfe9ff;
+    box-shadow: 0 5px 0 #123a99, 0 0 18px rgba(59, 180, 255, 0.6);
+    touch-action: none;
+  }
+  #boostBtn.on { transform: translateY(3px); box-shadow: 0 2px 0 #123a99, 0 0 30px #3bf0ff; filter: brightness(1.2); }
+  #boostBtn.empty { filter: grayscale(0.8) brightness(0.7); }
+  #boostBtn small { display: block; font-size: 12px; opacity: 0.85; }
+  #speedo { text-align: right; pointer-events: none; padding: 8px 18px; }
+  #speedo .big { font-size: 56px; font-weight: 700; line-height: 1; }
+  #speedo small { font-size: 13px; letter-spacing: 2px; opacity: 0.8; }
+
+  #howTo {
+    position: fixed; top: 262px; left: 12px;
+    padding: 10px 14px; font-size: 13.5px; line-height: 1.55;
+    max-width: 270px; pointer-events: none;
+  }
+  #howTo b { color: #ffd93b; }
+  #howTo .title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  #howTo .tip { opacity: 0.6; font-size: 12px; }
+
+  #crosshair {
+    position: fixed; top: 50%; left: 50%; width: 8px; height: 8px;
+    margin: -4px 0 0 -4px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.5); pointer-events: none; display: none;
+  }
+  #streakText {
+    position: fixed; top: 150px; left: 50%; transform: translateX(-50%);
+    font-size: 40px; font-weight: 700; color: #ff4fd8;
+    text-shadow: 0 0 14px #ff4fd8, 3px 3px 0 #000;
+    pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap;
+  }
+  #banner {
+    position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 54px; font-weight: 700; color: #ffd93b;
+    text-shadow: 0 0 20px #ffb400, 4px 4px 0 #000;
+    pointer-events: none; opacity: 0; transition: opacity 0.3s; text-align: center; width: 90vw;
+  }
+  #speedLines {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: repeating-conic-gradient(from 0deg, transparent 0deg 4deg, rgba(255,255,255,0.4) 4deg 4.5deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 30%, #000 85%);
+    mask-image: radial-gradient(circle, transparent 30%, #000 85%);
+  }
+  #vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, transparent 50%, rgba(0, 20, 60, 0.6) 100%); }
+  #boostGlow { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, transparent 45%, rgba(59, 240, 255, 0.35) 100%); }
+  #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, transparent 45%, rgba(255, 0, 0, 0.55) 100%); }
+  #perfectFlash { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(255, 217, 59, 0) 30%, rgba(255, 217, 59, 0.45) 100%); }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+  #popups { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .pop {
+    position: absolute; font-weight: 700; font-size: 26px;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000; transform: translate(-50%, -50%); white-space: nowrap;
+  }
+  .pop.huge { font-size: 40px; }
+
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at center, rgba(20, 30, 70, 0.75), rgba(5, 7, 15, 0.92));
+    text-align: center; padding: 16px; gap: 14px;
+  }
+  #startScreen {
+    align-items: flex-start; text-align: left; justify-content: flex-start;
+    padding: 28px 16px 28px max(16px, 5vw);
+    background: linear-gradient(90deg, rgba(5,7,15,0.94) 0%, rgba(5,7,15,0.78) 40%, rgba(5,7,15,0) 70%);
+    overflow-y: auto;
+  }
+  #startScreen > * { max-width: 540px; }
+  .screen h1 { font-size: 56px; color: #3bd5ff; text-shadow: 0 0 24px #3bd5ff, 4px 4px 0 #0a2a50; line-height: 1.05; }
+  .screen p { font-size: 17px; max-width: 540px; line-height: 1.5; }
+  .screen ol { text-align: left; font-size: 15px; line-height: 1.65; padding: 12px 18px 12px 38px; }
+  #outfits { display: flex; gap: 8px; flex-wrap: wrap; }
+  .outfit {
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    padding: 8px 12px; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,0.08); color: #fff;
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .outfit.sel { border-color: #ffd93b; background: rgba(255, 217, 59, 0.18); }
+  .sw { width: 16px; height: 16px; border-radius: 4px; display: inline-block; border: 1px solid rgba(0,0,0,.4); }
+  .ptitle { font-weight: 700; margin-bottom: 6px; color: #ffd93b; }
+  button.big {
+    font-family: inherit; font-size: 24px; font-weight: 700;
+    padding: 12px 44px; border: none; border-radius: 14px;
+    background: linear-gradient(#ffe55c, #ffb800); color: #3a2500; cursor: pointer;
+    box-shadow: 0 5px 0 #b37a00;
+  }
+  button.big:hover { filter: brightness(1.08); }
+  button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #b37a00; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body class="menu">
+
+<div id="speedLines"></div>
+<div id="vignette"></div>
+<div id="boostGlow"></div>
+<div id="hurt"></div>
+<div id="perfectFlash"></div>
+
+<div id="stats" class="panel game-ui">
+  <div class="row score"><span>💎 Score</span><b id="scoreNum">0</b></div>
+  <div class="row"><span>👑 Best score</span><b id="hiNum">0</b></div>
+  <div class="row"><span>🗺️ Level</span><b id="levelNum">1</b></div>
+  <div class="row"><span>⭐ Stars</span><b id="starNum">0/0</b></div>
+  <div class="row"><span>👾 Kills</span><b id="killNum">0</b></div>
+  <div class="row"><span>🔥 Streak</span><b id="streakNum">0</b> </div>
+  <div class="row"><span>🎯 Perfects</span><b id="perfNum">0</b></div>
+  <div class="row"><span>🕒 Survived</span><b><span id="aliveNum">0</span>s</b></div>
+</div>
+
+<div id="timer" class="panel game-ui"><small>SURVIVE</small><span id="timeLeft">40.0</span></div>
+<div id="bossBar" class="panel game-ui hidden">
+  <div class="name">👑 BOSS — jump over its shockwaves!</div>
+  <div class="bar"><div class="fill" id="bossFill"></div></div>
+</div>
+<canvas id="radar" class="game-ui" width="160" height="160"></canvas>
+
+<div id="bottom" class="game-ui">
+  <div id="timing" class="panel">
+    <div class="tlabel"><span>👊 Click when the line is in the <b>gold</b> zone!</span><span id="timingResult"></span></div>
+    <div id="track"><div id="goodZone"></div><div id="perfectZone"></div><div id="marker"></div></div>
+  </div>
+  <div id="bars" class="panel">
+    <div class="barRow"><span class="label">❤️ HP</span><div class="bar"><div class="fill" id="hpFill"></div></div><span class="num" id="hpNum">100</span></div>
+    <div class="barRow"><span class="label">⚡ Speed</span><div class="bar"><div class="fill" id="speedFill"></div></div><span class="num"></span></div>
+    <div class="barRow"><span class="label">🚀 Boost</span><div class="bar"><div class="fill" id="boostFill"></div></div><span class="num"></span></div>
+    <div class="barRow"><span class="label">👊 Attack</span><div class="bar"><div class="fill" id="atkFill"></div></div><span class="num"></span></div>
+    <div class="barRow"><span class="label">💨 Dash</span><div class="bar"><div class="fill" id="dashFill"></div></div><span class="num"></span></div>
+    <div class="barRow"><span class="label">🦘 Jumps</span><div id="jumpDots"><div class="jdot" id="j1"></div><div class="jdot" id="j2"></div><div class="jdot" id="j3"></div></div><span class="num"></span></div>
+  </div>
+</div>
+
+<div id="rightSide" class="game-ui">
+  <button id="boostBtn">🚀 BOOST<small>hold E or hold here</small></button>
+  <div id="speedo" class="panel"><div class="big" id="speedNum">0</div><small>SPEED</small></div>
+</div>
+
+<div id="howTo" class="panel game-ui">
+  <div class="title">HOW TO PLAY</div>
+  1. <b>W A S D</b> = run. Turning keeps your speed<br>
+  2. Hold <b>E</b> (or the BOOST button) = go even faster<br>
+  3. <b>Left-click</b> = attack in <b>front AND behind</b> you<br>
+  4. Faster = more damage. <b>Gold zone</b> = PERFECT x2<br>
+  5. <b>Space</b> = jump. Press up to <b>3 times</b> in the air<br>
+  6. Pads launch you up high · <b>pink pads</b> = super high<br>
+  7. Click in the air = <b>GROUND SLAM</b><br>
+  8. Grab ⭐ stars up high · go through 🔵 rings = boost · hit 🎯 targets = points<br>
+  9. <b>Shift</b> dash — dash THROUGH monsters to hurt them<br>
+  10. Monster shaking red = it's about to lunge. Get away!<br>
+  11. <b>Right-drag</b> camera · <b>Scroll</b> zoom<br>
+  <span class="tip">Only stopping slows you · H = hide · M = sound + music</span>
+</div>
+
+<div id="crosshair"></div>
+<div id="popups"></div>
+<div id="streakText"></div>
+<div id="banner"></div>
+<div id="flash"></div>
+
+<div id="startScreen" class="screen">
+  <h1>⚡ SPEED SMASH<br>RANGE</h1>
+  <p>You're a block with a face. Monsters invade the training range. Run fast, jump high and smash them! Every level up to 10 makes the map bigger with a new area.</p>
+  <div>
+    <div class="ptitle">Choose your block</div>
+    <div id="outfits"></div>
+  </div>
+  <ol class="panel">
+    <li><b>W A S D</b> run — turning and walls never slow you, only stopping does</li>
+    <li>Go through 🔵 <b>rings</b> for boost · hit 🎯 <b>targets</b> for points · <b>dash through</b> monsters to hurt them</li>
+    <li>A monster shaking red is about to <b>lunge</b> at you — dodge it!</li>
+    <li>Hold <b>E</b> or the <b>BOOST</b> button to go even faster</li>
+    <li><b>Left-click</b> attacks in <b>front and behind</b> you. Faster = more damage</li>
+    <li>Click when the timing line is in the <b>gold zone</b> = PERFECT x2</li>
+    <li><b>Space</b> jump, up to <b>triple jump</b> · glowing pads launch you to high places</li>
+    <li>Click in the air = <b>GROUND SLAM</b> · grab ⭐ stars up high</li>
+    <li><b>Shift</b> dash · <b>Right-click + drag</b> camera · <b>Scroll</b> zoom</li>
+    <li>Survive the timer → next level: bigger map, stronger monsters</li>
+  </ol>
+  <button class="big" id="startBtn">PLAY</button>
+  <p id="loadError" class="hidden" style="color:#ff6b6b">The 3D engine couldn't load. This game needs an internet connection the first time it opens.</p>
+</div>
+
+<div id="overScreen" class="screen hidden">
+  <h1>GAME OVER</h1>
+  <p id="overStats"></p>
+  <button class="big" id="againBtn">PLAY AGAIN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+if (typeof THREE === "undefined") {
+  $("loadError").classList.remove("hidden");
+  $("startBtn").disabled = true;
+  throw new Error("three.js did not load");
+}
+
+// ======================================================================
+// SETTINGS
+// ======================================================================
+const BASE_SPEED = 9;
+const MAX_BONUS = 36;        // running top speed = 45
+const GROW = 4.5;
+const BOOST_ADD = 15;        // extra speed while holding BOOST
+const BOOST_DRAIN = 0.33, BOOST_REFILL = 0.15;
+const DASH_BOOST = 18, DASH_TIME = 0.45, DASH_COOLDOWN = 2;
+const SAFE_SPEED = 13;
+const STREAK_WINDOW = 3;
+const PLAYER_R = 1.2, PLAYER_H = 2.4;   // you are a 2.4 block
+
+const JUMP_V = 18, AIR_JUMP_V = 17, MAX_JUMPS = 3;
+const PAD_V = 34, SUPER_PAD_V = 48;
+const GRAV_UP = 40, GRAV_DOWN = 58, SLAM_V = -55;
+
+const ATTACK_COOLDOWN = 0.3;
+const ATTACK_MIN_SPEED = 4;
+const ATTACK_COST = 0.6;
+const ATTACK_RANGE = 5;
+const ATTACK_CONE = 0.45;    // hits in FRONT and BEHIND you
+
+const TIMING_PERIOD = 0.6;
+const PERFECT_ZONE = 0.06, GOOD_ZONE = 0.16;
+const PERFECT_MULT = 2.0, GOOD_MULT = 1.4;
+
+const MAX_MAP_LEVEL = 10;
+function mapHalf(lv) { return 40 + (Math.min(lv, MAX_MAP_LEVEL) - 1) * 12; } // 40 → 148
+function levelTime(lv) { return 40 + (lv - 1) * 15; }
+function maxMonsters(lv) { return 4 + lv * 3; }
+function attackDamage(speed) { return Math.round(5 + speed * 1.2 + speed * speed * 0.04); }
+const TOP_SPEED = BASE_SPEED + MAX_BONUS + BOOST_ADD + DASH_BOOST;
+
+// ======================================================================
+// RENDERER + SCENE
+// ======================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.prepend(renderer.domElement);
+const canvas = renderer.domElement;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+addEventListener("resize", () => {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+const lin = hex => new THREE.Color(hex).convertSRGBToLinear();
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+// seeded random so the map is ALWAYS the same
+function seeded(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 0.6));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+Object.assign(sun.shadow.camera, { left: -75, right: 75, top: 75, bottom: -75, near: 1, far: 260 });
+scene.add(sun, sun.target);
+
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: { top: { value: new THREE.Color(0x3a8fe0) }, bottom: { value: new THREE.Color(0xdcefff) } },
+  vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform vec3 top; uniform vec3 bottom; varying vec3 vP;
+    void main(){ float h = normalize(vP).y; gl_FragColor = vec4(mix(bottom, top, smoothstep(-0.02, 0.55, h)), 1.0); }`,
+  side: THREE.BackSide, depthWrite: false,
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), skyMat);
+sky.renderOrder = -1;
+scene.add(sky);
+scene.fog = new THREE.Fog(lin(0xdcefff), 180, 520);
+
+// ======================================================================
+// TEXTURES (drawn in code)
+// ======================================================================
+function canvasTexture(size, draw) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  draw(c.getContext("2d"), size);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+const floorTex = canvasTexture(128, (g, s) => {
+  g.fillStyle = "#c7cbd2"; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 300; i++) { g.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"; g.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
+  g.fillStyle = "#aab0b9"; g.fillRect(0, 0, s, 3); g.fillRect(0, 0, 3, s);
+});
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+const edgeTex = canvasTexture(64, (g, s) => {
+  g.fillStyle = "#f2f2f2"; g.fillRect(0, 0, s, s);
+  g.strokeStyle = "#b8b8b8"; g.lineWidth = 6; g.strokeRect(0, 0, s, s);
+  g.fillStyle = "rgba(255,255,255,0.5)"; g.fillRect(6, 6, s - 12, 4);
+});
+const hazardTex = canvasTexture(64, (g, s) => {
+  g.fillStyle = "#222"; g.fillRect(0, 0, s, s);
+  g.fillStyle = "#ffb81a";
+  for (let i = -s; i < s * 2; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 16, 0); g.lineTo(i + 16 - s, s); g.lineTo(i - s, s); g.fill(); }
+});
+hazardTex.wrapS = THREE.RepeatWrapping;
+const targetTex = canvasTexture(128, (g, s) => {
+  const c = s / 2;
+  ["#e8322e", "#ffffff", "#e8322e", "#ffffff", "#e8322e"].forEach((col, i) => {
+    g.fillStyle = col; g.beginPath(); g.arc(c, c, c * (1 - i * 0.2), 0, Math.PI * 2); g.fill();
+  });
+});
+
+// ======================================================================
+// SHARED SHAPES + MATERIALS
+// ======================================================================
+const BOX = new THREE.BoxGeometry(1, 1, 1);
+const PLANE = new THREE.PlaneGeometry(1, 1);
+const SPHERE = new THREE.SphereGeometry(0.6, 14, 10);
+const RING_GEO = new THREE.RingGeometry(0.85, 1, 64);
+const WAVE_GEO = new THREE.RingGeometry(0.9, 1, 96);
+const DISC_GEO = new THREE.CircleGeometry(1, 48);
+const OCTA = new THREE.OctahedronGeometry(0.8);
+const PAD_GEO = new THREE.CylinderGeometry(2.4, 2.6, 0.3, 32);
+const TARGET_GEO = new THREE.CylinderGeometry(1.4, 1.4, 0.2, 32);
+
+const matCache = {};
+function mat(color, textured = false) {
+  const key = color + (textured ? "t" : "");
+  if (!matCache[key]) matCache[key] = new THREE.MeshStandardMaterial({ color: lin(color), roughness: 0.7, metalness: 0, map: textured ? edgeTex : null });
+  return matCache[key];
+}
+const basicCache = {};
+function basic(color) {
+  if (!basicCache[color]) basicCache[color] = new THREE.MeshBasicMaterial({ color: lin(color) });
+  return basicCache[color];
+}
+function cube(w, h, d, material, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(BOX, material);
+  m.scale.set(w, h, d);
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function glowMaterial(color, opacity = 0.85) {
+  return new THREE.MeshBasicMaterial({ color: lin(color), transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+}
+const targetMat = new THREE.MeshStandardMaterial({ map: targetTex, roughness: 0.8 });
+const targetSideMat = mat(0xeeeeee);
+const padMat = glowMaterial(0x7dff6a, 0.9);
+const superPadMat = glowMaterial(0xff4fd8, 0.95);
+const starMat = new THREE.MeshBasicMaterial({ color: lin(0xffd93b) });
+
+// ======================================================================
+// THE MAP — always the same layout. It grows with a new area every level until level 10.
+// ======================================================================
+const AREA_NAMES = ["Training Grounds", "Shooting Lanes", "Watchtowers", "Container Yard", "Catwalks",
+                    "Step Pyramids", "Big Walls", "Sky Islands", "Bunker Line", "Mega Towers"];
+const C = { // colors of the range
+  floor: 0xc7cbd2, wall: 0x8d949e, white: 0xf2f2f2, gray: 0x9aa1ab, dark: 0x4a505a,
+  orange: 0xff7a1a, blue: 0x2f8fff, crate: 0xb07a45, yellow: 0xffc21a,
+  boxes: [0xd9452b, 0x2b7bd9, 0x2bb35a, 0xe0a020, 0x8a8f99, 0xf2f2f2],
+};
+
+let world = null, worldTrash = [];
+let boxes = [], solidMeshes = [], pads = [], stars = [];
+let targets = [], boostRings = [], flags = [], clouds = [];
+let HALF = 40;
+
+function trash(x) { worldTrash.push(x); return x; }
+
+// a solid block: from "bottom" up to bottom + h
+function addBox(x, z, w, h, d, color, opt = {}) {
+  const bottom = opt.bottom || 0;
+  const m = cube(w, h, d, mat(color, opt.tex !== false), x, bottom + h / 2, z);
+  world.add(m);
+  boxes.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, bottom, top: bottom + h });
+  solidMeshes.push(m);
+  if (opt.glow) {
+    const s = cube(w + 0.06, 0.18, d + 0.06, basic(opt.glow), x, bottom + h - 0.3, z);
+    s.castShadow = false;
+    world.add(s);
+  }
+  return m;
+}
+function decor(x, y, z, w, h, d, material) {
+  const m = cube(w, h, d, material, x, y, z);
+  m.castShadow = false;
+  world.add(m);
+  return m;
+}
+function addPad(x, z, superPad = false, y = 0) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  const base = new THREE.Mesh(PAD_GEO, mat(0x2a2e38));
+  base.position.y = 0.15; base.receiveShadow = true;
+  const top = new THREE.Mesh(DISC_GEO, superPad ? superPadMat : padMat);
+  top.scale.setScalar(2); top.rotation.x = -Math.PI / 2; top.position.y = 0.32;
+  const ring = new THREE.Mesh(RING_GEO, superPad ? superPadMat : padMat);
+  ring.scale.setScalar(2.4); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.34;
+  const arrow = new THREE.Group();
+  const ac = basic(superPad ? 0xff9cf0 : 0xc8ffb8);
+  arrow.add(cube(0.5, 1.2, 0.5, ac, 0, 0, 0), cube(1.3, 0.5, 0.5, ac, 0, 0.7, 0));
+  if (superPad) arrow.add(cube(1.3, 0.5, 0.5, ac, 0, 1.4, 0));
+  arrow.position.y = 2;
+  g.add(base, top, ring, arrow);
+  world.add(g);
+  pads.push({ x, z, y, superPad, top, arrow, pulse: 0 });
+}
+// practice targets: you can run through them, and HIT them for points
+function addTarget(x, z) {
+  decor(x, 1.5, z, 0.3, 3, 0.3, mat(C.white));
+  const t = new THREE.Mesh(TARGET_GEO, [targetSideMat, targetMat, targetMat]);
+  t.position.set(x, 3.6, z);
+  t.lookAt(0, 3.6, 0);
+  t.rotateX(Math.PI / 2);
+  t.castShadow = true;
+  world.add(t);
+  targets.push({ m: t, x, z, down: 0, wobble: 0 });
+}
+// boost rings: go through them for boost + points
+const RING_TORUS = new THREE.TorusGeometry(2.6, 0.28, 8, 32);
+const boostRingMat = glowMaterial(0x3bf0ff, 0.9);
+const boostRingOffMat = glowMaterial(0x3bf0ff, 0.2);
+// flat = lying down (for flying up through it from a jump pad)
+function addRing(x, y, z, yaw, flat = false) {
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(RING_TORUS, boostRingMat);
+  if (flat) m.rotation.x = Math.PI / 2; else g.rotation.y = yaw;
+  g.position.set(x, y, z);
+  g.add(m);
+  world.add(g);
+  boostRings.push({ m, x, y, z, nx: flat ? 0 : Math.sin(yaw), ny: flat ? 1 : 0, nz: flat ? 0 : Math.cos(yaw), cd: 0, side: 0 });
+}
+// waving flags on top of the walls
+const flagMats = [0xff7a1a, 0x2f8fff, 0xffffff, 0xffc21a].map(c => new THREE.MeshStandardMaterial({ color: lin(c), side: THREE.DoubleSide, roughness: 0.9 }));
+function addFlag(x, y, z, i) {
+  world.add(cube(0.25, 5, 0.25, mat(C.dark), x, y + 2.5, z));
+  const pivot = new THREE.Group();
+  pivot.position.set(x, y + 4.3, z);
+  const f = new THREE.Mesh(PLANE, flagMats[i % flagMats.length]);
+  f.scale.set(2.6, 1.5, 1); f.position.x = 1.3;
+  pivot.add(f);
+  world.add(pivot);
+  flags.push({ pivot, f, ph: i * 0.7 });
+}
+function addStar(x, y, z) {
+  const m = new THREE.Mesh(OCTA, starMat);
+  m.position.set(x, y + 1.5, z);
+  const ring = new THREE.Mesh(RING_GEO, glowMaterial(0xffd93b, 0.7));
+  trash(ring.material);
+  ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(1.6); ring.position.set(x, y + 0.08, z);
+  world.add(m, ring);
+  stars.push({ m, ring, x, y, z, got: false });
+}
+function crateStack(x, z, rng) {
+  addBox(x, z, 3, 3, 3, C.crate);
+  if (rng() < 0.5) addBox(x + rng() * 0.6 - 0.3, z + rng() * 0.6 - 0.3, 2.4, 2.4, 2.4, C.crate, { bottom: 3 });
+}
+function tower(x, z, height, starOnTop) {
+  const legs = height;
+  addBox(x, z, 6, legs, 6, C.gray, { glow: C.blue });
+  addBox(x, z, 7, 0.6, 7, C.white, { bottom: legs, glow: C.orange });
+  addBox(x, z, 1, 6, 1, C.gray, { bottom: legs + 0.6 });
+  addBox(x, z, 3, 0.5, 3, C.orange, { bottom: legs + 6.6 });
+  if (starOnTop) addStar(x, legs + 7.1, z);
+}
+function pyramid(x, z, tiers, stepH, color) {
+  for (let i = 0; i < tiers; i++) addBox(x, z, 3 + (tiers - 1 - i) * 2.4, stepH * (i + 1) - (i ? stepH * i : 0), 3 + (tiers - 1 - i) * 2.4, color, { bottom: stepH * i, glow: i === tiers - 1 ? C.yellow : null });
+  addStar(x, stepH * tiers, z);
+}
+
+// a point on the square "band" between inner and outer. t goes 0→1 around the map.
+function bandPoint(t, s) {
+  t = ((t % 1) + 1) % 1;
+  const side = Math.floor(t * 4), u = (t * 4 - side) * 2 - 1;
+  if (side === 0) return { x: u * s, z: -s, u, nx: 0, nz: 1 };
+  if (side === 1) return { x: s, z: u * s, u, nx: -1, nz: 0 };
+  if (side === 2) return { x: -u * s, z: s, u, nx: 0, nz: -1 };
+  return { x: -s, z: -u * s, u, nx: 1, nz: 0 };
+}
+const corners = s => [[-s, -s], [s, -s], [s, s], [-s, s]];
+
+// each new area added by a level
+const AREAS = [
+  // 1 — Training Grounds (the middle)
+  (inner, outer, rng) => {
+    decor(0, 0.02, 0, 12, 0.04, 12, basic(0xffffff));
+    decor(0, 0.03, 0, 10, 0.04, 10, basic(C.orange));
+    decor(0, 0.04, 0, 8, 0.04, 8, mat(C.floor));
+    // big walls instead of little stuff in your way
+    addBox(-27, -8, 2, 7, 14, C.white, { glow: C.orange });
+    addBox(27, 8, 2, 7, 14, C.white, { glow: C.orange });
+    addBox(8, -27, 14, 7, 2, C.white, { glow: C.blue });
+    addBox(-8, 27, 14, 7, 2, C.white, { glow: C.blue });
+    // boost rings
+    addRing(0, 3.5, -14, 0); addRing(0, 3.5, 14, 0);
+    addRing(-14, 3.5, 0, Math.PI / 2); addRing(14, 3.5, 0, Math.PI / 2);
+    for (const [x, z] of [[-18, -18], [18, -18], [-18, 18], [18, 18]]) addRing(x, 10, z, 0, true); // fly up through these from the pads
+    for (const [x, z] of [[-33, -33], [33, -33], [-33, 33], [33, 33], [-12, -34], [12, 34]]) addTarget(x, z);
+    for (const [x, z] of [[-18, -18], [18, -18], [-18, 18], [18, 18]]) addPad(x, z);
+    // sky deck above the middle
+    addBox(0, 0, 9, 0.6, 9, C.white, { bottom: 14, glow: C.blue });
+    addStar(0, 14.6, 0);
+    addPad(8, 0, true);
+    pyramid(22, -30, 3, 1.6, C.gray);
+    pyramid(-22, 30, 3, 1.6, C.gray);
+  },
+  // 2 — Shooting Lanes
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    for (let i = 0; i < 12; i++) {
+      const p = bandPoint((i + 0.5) / 12, s);
+      if (Math.abs(p.u) < 0.12) continue;
+      const along = p.nx === 0;
+      addBox(p.x, p.z, along ? 2 : 10, 6, along ? 10 : 2, C.white, { glow: C.blue });
+      addTarget(p.x - p.nx * 4 + (along ? 5 : 0), p.z - p.nz * 4 + (along ? 0 : 5));
+      addTarget(p.x - p.nx * 4 - (along ? 5 : 0), p.z - p.nz * 4 - (along ? 0 : 5));
+      addRing(p.x + (along ? -8 : 0), 3.5, p.z + (along ? 0 : -8), along ? Math.PI / 2 : 0);
+    }
+    for (const [x, z] of corners(s)) { addBox(x, z, 8, 3, 8, C.gray, { glow: C.orange }); addPad(x * 0.9 + (x > 0 ? -4 : 4) * 0, z - Math.sign(z) * 7); }
+    for (const t of [0.125, 0.375, 0.625, 0.875]) { const p = bandPoint(t, s); addPad(p.x + p.nx * 2, p.z + p.nz * 2); }
+  },
+  // 3 — Watchtowers
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    corners(s).forEach(([x, z]) => { tower(x, z, 9, true); addPad(x - Math.sign(x) * 6, z - Math.sign(z) * 6); });
+    for (const t of [0.13, 0.38, 0.63, 0.88]) {
+      const p = bandPoint(t, s);
+      tower(p.x, p.z, 7, false);
+      addPad(p.x + p.nx * 6, p.z + p.nz * 6);
+    }
+    for (let i = 0; i < 8; i++) { const p = bandPoint((i + 0.5) / 8, s); addRing(p.x, 4, p.z, p.nx === 0 ? Math.PI / 2 : 0); }
+  },
+  // 4 — Container Yard
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    for (let i = 0; i < 16; i++) {
+      const p = bandPoint((i + 0.5) / 16, s);
+      if (Math.abs(p.u) < 0.15) continue;
+      const along = p.nx === 0;
+      const c1 = C.boxes[Math.floor(rng() * 5)];
+      addBox(p.x, p.z, along ? 9 : 3.6, 3, along ? 3.6 : 9, c1);
+      if (rng() < 0.6) addBox(p.x, p.z, along ? 9 : 3.6, 3, along ? 3.6 : 9, C.boxes[Math.floor(rng() * 5)], { bottom: 3 });
+      if (rng() < 0.3) addBox(p.x, p.z, along ? 9 : 3.6, 3, along ? 3.6 : 9, C.boxes[Math.floor(rng() * 5)], { bottom: 6 });
+      if (i % 2 === 0) addPad(p.x + p.nx * 4.5, p.z + p.nz * 4.5);
+    }
+    corners(s).forEach(([x, z]) => { pyramid(x, z, 4, 3, C.boxes[Math.floor(rng() * 5)]); });
+  },
+  // 5 — Catwalks
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    for (let side = 0; side < 4; side++) {
+      for (const [a, b] of [[-0.85, -0.25], [0.25, 0.85]]) {
+        const p1 = bandPoint((side + (a + 1) / 2) / 4, s), p2 = bandPoint((side + (b + 1) / 2) / 4, s);
+        const cx = (p1.x + p2.x) / 2, cz = (p1.z + p2.z) / 2;
+        const len = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+        const along = p1.nx === 0;
+        addBox(cx, cz, along ? len : 3, 0.5, along ? 3 : len, C.white, { bottom: 7, glow: C.orange });
+        addRing(cx, 10.5, cz, along ? Math.PI / 2 : 0); // ring floating above the catwalk
+        addPad(p1.x + p1.nx * 4, p1.z + p1.nz * 4);
+        if (side % 2 === 0) addStar(cx, 7.5, cz);
+      }
+    }
+    corners(s).forEach(([x, z]) => addBox(x, z, 6, 0.5, 6, C.orange, { bottom: 7 }));
+  },
+  // 6 — Step Pyramids
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    corners(s).forEach(([x, z]) => pyramid(x, z, 5, 2, C.white));
+    for (const t of [0.125, 0.375, 0.625, 0.875]) { const p = bandPoint(t, s); pyramid(p.x, p.z, 3, 2, C.gray); }
+    for (let i = 0; i < 16; i++) { const p = bandPoint((i + 0.5) / 16, s); if (Math.abs(p.u) > 0.2 && Math.abs(p.u) < 0.85 && i % 2) addPad(p.x, p.z); }
+  },
+  // 7 — Big Walls
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    const tops = [];
+    for (let i = 0; i < 12; i++) {
+      const p = bandPoint((i + 0.5) / 12, s);
+      if (Math.abs(p.u) < 0.12) continue;
+      const along = p.nx === 0;
+      const h = 6 + rng() * 10;
+      addBox(p.x, p.z, along ? 14 : 3, h, along ? 3 : 14, i % 2 ? C.gray : C.white, { glow: i % 2 ? C.blue : C.orange });
+      tops.push({ x: p.x, z: p.z, h });
+      addPad(p.x + p.nx * 4.5, p.z + p.nz * 4.5);
+    }
+    for (const t of [0.125, 0.375, 0.625, 0.875]) { const p = bandPoint(t, s); addRing(p.x, 5, p.z, p.nx === 0 ? Math.PI / 2 : 0); }
+    tops.sort((a, b) => b.h - a.h).slice(0, 3).forEach(t => addStar(t.x, t.h, t.z));
+  },
+  // 8 — Sky Islands
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    let k = 0;
+    for (let i = 0; i < 16; i++) {
+      const p = bandPoint((i + 0.5) / 16, s);
+      if (Math.abs(p.u) < 0.15) continue;
+      const y = 13 + (k % 4) * 3.5, w = 6 + rng() * 3;
+      addBox(p.x, p.z, w, 1, w, 0x8a5a3a, { bottom: y - 1.3 });
+      addBox(p.x, p.z, w, 0.3, w, 0x5cbf4f, { bottom: y - 0.3, tex: false });
+      addPad(p.x + p.nx * 5, p.z + p.nz * 5, true);
+      if (k % 2 === 1) addStar(p.x, y, p.z);
+      k++;
+    }
+    corners(s).forEach(([x, z]) => { addBox(x, z, 8, 1, 8, 0x8a5a3a, { bottom: 24 }); addBox(x, z, 8, 0.3, 8, 0x5cbf4f, { bottom: 25, tex: false }); addStar(x, 25.3, z); addPad(x - Math.sign(x) * 5, z - Math.sign(z) * 5, true); });
+  },
+  // 9 — Bunker Line
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    for (const t of [0.07, 0.18, 0.32, 0.43, 0.57, 0.68, 0.82, 0.93]) {
+      const p = bandPoint(t, s);
+      // a bunker: 3 walls and a roof you can stand on
+      const along = p.nx === 0;
+      const ox = along ? 1 : 0, oz = along ? 0 : 1;
+      addBox(p.x + ox * 3.6, p.z + oz * 3.6, along ? 0.8 : 8, 3, along ? 8 : 0.8, C.dark);
+      addBox(p.x - ox * 3.6, p.z - oz * 3.6, along ? 0.8 : 8, 3, along ? 8 : 0.8, C.dark);
+      addBox(p.x - p.nx * 3.6, p.z - p.nz * 3.6, along ? 8 : 0.8, 3, along ? 0.8 : 8, C.dark);
+      addBox(p.x, p.z, 8.8, 0.5, 8.8, C.yellow, { bottom: 3 });
+      addPad(p.x + p.nx * 6, p.z + p.nz * 6);
+    }
+    for (const t of [0.125, 0.375, 0.625, 0.875]) { const p = bandPoint(t, s); addRing(p.x, 4, p.z, p.nx === 0 ? Math.PI / 2 : 0); }
+  },
+  // 10 — Mega Towers (spiral up to the sky)
+  (inner, outer, rng) => {
+    const s = (inner + outer) / 2;
+    corners(s).forEach(([x, z], ci) => {
+      addBox(x, z, 3, 42, 3, C.dark, { glow: C.orange });
+      for (let i = 0; i < 16; i++) {
+        const a = i * Math.PI / 4 + ci;
+        addBox(x + Math.cos(a) * 4.2, z + Math.sin(a) * 4.2, 3.2, 0.5, 3.2, i % 2 ? C.orange : C.white, { bottom: 2.4 * (i + 1) - 0.5 });
+      }
+      // the last, bigger step at the very top
+      const a = 16 * Math.PI / 4 + ci, top = 2.4 * 17;
+      const tx = x + Math.cos(a) * 4.2, tz = z + Math.sin(a) * 4.2;
+      addBox(tx, tz, 4.6, 0.6, 4.6, C.yellow, { bottom: top - 0.6, glow: C.blue });
+      addStar(tx, top, tz);
+    });
+    for (const t of [0.125, 0.375, 0.625, 0.875]) { const p = bandPoint(t, s); addPad(p.x, p.z, true); }
+  },
+];
+
+function buildMap(lv) {
+  if (world) scene.remove(world);
+  worldTrash.forEach(x => x.dispose && x.dispose());
+  worldTrash = []; boxes = []; solidMeshes = []; pads = []; stars = [];
+  targets = []; boostRings = []; flags = []; clouds = [];
+  world = new THREE.Group();
+  scene.add(world);
+
+  const L = Math.min(lv, MAX_MAP_LEVEL);
+  HALF = mapHalf(L);
+
+  // floor
+  const size = HALF * 2 + 8;
+  const tex = trash(floorTex.clone());
+  tex.needsUpdate = true;
+  tex.repeat.set(size / 4, size / 4);
+  const floor = new THREE.Mesh(trash(new THREE.PlaneGeometry(size, size)), trash(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  world.add(floor);
+  // yellow lines where the old edges were (shows how the map grew)
+  for (let k = 1; k < L; k++) {
+    const h = mapHalf(k);
+    decor(0, 0.03, -h, h * 2, 0.04, 0.5, basic(C.yellow));
+    decor(0, 0.03, h, h * 2, 0.04, 0.5, basic(C.yellow));
+    decor(-h, 0.03, 0, 0.5, 0.04, h * 2, basic(C.yellow));
+    decor(h, 0.03, 0, 0.5, 0.04, h * 2, basic(C.yellow));
+  }
+
+  // the areas, always built the same way (same seed)
+  for (let k = 1; k <= L; k++) AREAS[k - 1](mapHalf(k - 1) * (k > 1 ? 1 : 0), mapHalf(k), seeded(k * 7919));
+
+  // outer walls with orange stripe and hazard base
+  const WALL_H = 12, len = HALF * 2 + 4;
+  const hz = trash(hazardTex.clone()); hz.needsUpdate = true; hz.repeat.set(len / 2, 1);
+  const hzMat = trash(new THREE.MeshStandardMaterial({ map: hz, roughness: 0.8 }));
+  for (const [x, z, along, nx, nz] of [[0, -HALF - 1, true, 0, 1], [0, HALF + 1, true, 0, -1], [-HALF - 1, 0, false, 1, 0], [HALF + 1, 0, false, -1, 0]]) {
+    const w = cube(along ? len : 2, WALL_H, along ? 2 : len, mat(C.wall, true), x, WALL_H / 2, z);
+    world.add(w); solidMeshes.push(w);
+    decor(x + nx * 1.05, 8, z + nz * 1.05, along ? len : 0.1, 0.8, along ? 0.1 : len, basic(C.orange));
+    decor(x + nx * 1.05, 9, z + nz * 1.05, along ? len : 0.1, 0.25, along ? 0.1 : len, basic(0xffffff));
+    decor(x + nx * 1.05, 0.6, z + nz * 1.05, along ? len : 0.1, 1.2, along ? 0.1 : len, hzMat);
+    // monster gate in the middle of each wall
+    decor(x + nx * 1.06, 2.5, z + nz * 1.06, along ? 7 : 0.1, 5, along ? 0.1 : 7, basic(0x0a0a0a));
+    decor(x + nx * 1.08, 5.2, z + nz * 1.08, along ? 7.8 : 0.12, 0.4, along ? 0.12 : 7.8, basic(0xff3b3b));
+  }
+  // flags along the top of the walls
+  let fi = 0;
+  for (let u = -HALF + 10; u <= HALF - 10; u += 20) {
+    addFlag(u, WALL_H, -HALF - 1, fi++); addFlag(u, WALL_H, HALF + 1, fi++);
+    addFlag(-HALF - 1, WALL_H, u, fi++); addFlag(HALF + 1, WALL_H, u, fi++);
+  }
+  // drifting clouds
+  const cloudMat = trash(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.92 }));
+  for (let i = 0; i < 22; i++) {
+    const g = new THREE.Group();
+    const n = 3 + (i % 3);
+    for (let j = 0; j < n; j++) {
+      const c = new THREE.Mesh(BOX, cloudMat);
+      c.scale.set(rand(8, 16), rand(3, 5), rand(6, 10));
+      c.position.set(j * rand(5, 8), rand(-1, 1), rand(-3, 3));
+      g.add(c);
+    }
+    g.position.set(rand(-HALF - 60, HALF + 60), rand(55, 85), rand(-HALF - 60, HALF + 60));
+    world.add(g);
+    clouds.push(g);
+  }
+  // light poles in the corners
+  for (const [x, z] of corners(HALF + 4)) {
+    world.add(cube(1.5, 30, 1.5, mat(C.dark), x, 15, z));
+    const head = cube(6, 2, 2, basic(0xffffee), x, 30, z);
+    head.lookAt(0, 30, 0);
+    world.add(head);
+  }
+}
+
+// ======================================================================
+// COLLISION (blocks can float: they have a bottom and a top)
+// ======================================================================
+function collide(ent, r, h, canStep) {
+  let gh = 0, ceil = Infinity, wall = null;
+  for (const b of boxes) {
+    const cx = Math.max(b.minX, Math.min(ent.x, b.maxX));
+    const cz = Math.max(b.minZ, Math.min(ent.z, b.maxZ));
+    const dx = ent.x - cx, dz = ent.z - cz, d2 = dx * dx + dz * dz;
+    if (d2 >= r * r) continue;
+    if (ent.y >= b.top - 0.05) { gh = Math.max(gh, b.top); continue; }          // standing on it
+    if (ent.y + h <= b.bottom + 0.05) { ceil = Math.min(ceil, b.bottom); continue; } // it's above your head
+    if (canStep && b.top <= ent.y + 0.7) { gh = Math.max(gh, b.top); continue; }  // small step up
+    let nx, nz;
+    const d = Math.sqrt(d2);
+    if (d > 0.0001) {
+      nx = dx / d; nz = dz / d;
+      ent.x = cx + nx * r; ent.z = cz + nz * r;
+    } else {
+      const l = ent.x - b.minX, rr = b.maxX - ent.x, t = ent.z - b.minZ, bt = b.maxZ - ent.z;
+      const m = Math.min(l, rr, t, bt);
+      if (m === l) { ent.x = b.minX - r; nx = -1; nz = 0; }
+      else if (m === rr) { ent.x = b.maxX + r; nx = 1; nz = 0; }
+      else if (m === t) { ent.z = b.minZ - r; nx = 0; nz = -1; }
+      else { ent.z = b.maxZ + r; nx = 0; nz = 1; }
+    }
+    wall = { nx, nz };
+  }
+  const lim = HALF - r;
+  if (ent.x > lim) { ent.x = lim; wall = { nx: -1, nz: 0 }; }
+  if (ent.x < -lim) { ent.x = -lim; wall = { nx: 1, nz: 0 }; }
+  if (ent.z > lim) { ent.z = lim; wall = { nx: 0, nz: -1 }; }
+  if (ent.z < -lim) { ent.z = -lim; wall = { nx: 0, nz: 1 }; }
+  return { gh, ceil, wall };
+}
+function groundBelow(x, z, y) {
+  let gh = 0;
+  for (const b of boxes) if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && b.top <= y + 0.1) gh = Math.max(gh, b.top);
+  return gh;
+}
+function insideBox(x, y, z) {
+  for (const b of boxes) if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && y > b.bottom && y < b.top) return true;
+  return false;
+}
+
+// ======================================================================
+// THE AVATAR: a block with a face
+// ======================================================================
+const BLOCKS = [
+  { name: "Red",    color: 0xff4d4d, glow: 0xff9a9a },
+  { name: "Blue",   color: 0x3b82ff, glow: 0x9fc4ff },
+  { name: "Green",  color: 0x3ccf5a, glow: 0x9dffb0 },
+  { name: "Yellow", color: 0xffcc1a, glow: 0xfff09a },
+  { name: "Purple", color: 0x9b59ff, glow: 0xd6b8ff },
+  { name: "Pink",   color: 0xff6fb5, glow: 0xffb8dc },
+  { name: "White",  color: 0xf2f2f2, glow: 0xffffff },
+];
+let blockIndex = 1;
+try { blockIndex = Math.min(BLOCKS.length - 1, Math.max(0, +(localStorage.getItem("speedSmashBlock") ?? 1))); } catch (e) {}
+
+function makeAvatar(o) {
+  const root = new THREE.Group();          // turns
+  const body = new THREE.Group();          // leans, flips, squashes, spins
+  body.position.y = PLAYER_H / 2;
+  root.add(body);
+  const S = PLAYER_H, F = S / 2 + 0.01;
+  body.add(cube(S, S, S, mat(o.color, true)));
+  const black = basic(0x111111), white = basic(0xffffff);
+
+  const eyes = new THREE.Group();
+  for (const sx of [-0.5, 0.5]) {
+    eyes.add(cube(0.55, 0.65, 0.05, white, sx, 0.3, F));
+    eyes.add(cube(0.28, 0.38, 0.05, black, sx + 0.05, 0.25, F + 0.02));
+    eyes.add(cube(0.09, 0.09, 0.03, white, sx + 0.12, 0.36, F + 0.04));
+  }
+  const smile = new THREE.Group();
+  smile.add(cube(0.7, 0.14, 0.05, black, 0, -0.45, F));
+  smile.add(cube(0.16, 0.14, 0.05, black, -0.42, -0.36, F));
+  smile.add(cube(0.16, 0.14, 0.05, black, 0.42, -0.36, F));
+  const fastFace = new THREE.Group();     // mouth open + determined eyebrows
+  fastFace.add(cube(0.7, 0.42, 0.05, black, 0, -0.45, F));
+  fastFace.add(cube(0.4, 0.14, 0.06, basic(0xff4d6a), 0, -0.58, F + 0.01));
+  const b1 = cube(0.6, 0.12, 0.05, black, -0.5, 0.78, F); b1.rotation.z = -0.3;
+  const b2 = cube(0.6, 0.12, 0.05, black, 0.5, 0.78, F); b2.rotation.z = 0.3;
+  fastFace.add(b1, b2);
+  const hurtFace = new THREE.Group();     // X X eyes
+  for (const sx of [-0.5, 0.5]) for (const r of [0.785, -0.785]) {
+    const x = cube(0.6, 0.12, 0.05, black, sx, 0.3, F + 0.02); x.rotation.z = r; hurtFace.add(x);
+  }
+  hurtFace.add(cube(0.5, 0.12, 0.05, black, 0, -0.45, F));
+  const cheeks = new THREE.Group();
+  cheeks.add(cube(0.3, 0.15, 0.04, basic(0xff8fa8), -0.85, -0.18, F), cube(0.3, 0.15, 0.04, basic(0xff8fa8), 0.85, -0.18, F));
+  body.add(eyes, smile, fastFace, hurtFace, cheeks);
+
+  root.userData = { body, eyes, smile, fastFace, hurtFace, outfit: o };
+  return root;
+}
+
+let playerModel = makeAvatar(BLOCKS[blockIndex]);
+scene.add(playerModel);
+
+function setBlock(i) {
+  blockIndex = i;
+  try { localStorage.setItem("speedSmashBlock", i); } catch (e) {}
+  const rotY = playerModel.rotation.y;
+  scene.remove(playerModel);
+  playerModel = makeAvatar(BLOCKS[i]);
+  playerModel.rotation.y = rotY;
+  scene.add(playerModel);
+  document.querySelectorAll(".outfit").forEach((b, j) => b.classList.toggle("sel", j === i));
+}
+BLOCKS.forEach((o, i) => {
+  const b = document.createElement("button");
+  b.className = "outfit" + (i === blockIndex ? " sel" : "");
+  b.innerHTML = `<span class="sw" style="background:#${o.color.toString(16).padStart(6, "0")}"></span>${o.name}`;
+  b.onclick = () => setBlock(i);
+  $("outfits").appendChild(b);
+});
+
+// ======================================================================
+// MONSTERS
+// ======================================================================
+const MONSTER_TYPES = {
+  normal:  { color: 0x7b2fbf, scale: 1.0,  hp: 1.0, speed: 1.0,  dmg: 1.0, score: 100 },
+  fast:    { color: 0xf9b825, scale: 0.75, hp: 0.6, speed: 1.55, dmg: 0.7, score: 120 },
+  spitter: { color: 0x2fbf6a, scale: 0.95, hp: 0.8, speed: 0.75, dmg: 0.8, score: 150 },
+  bat:     { color: 0x3d3d5c, scale: 0.8,  hp: 0.5, speed: 1.25, dmg: 0.7, score: 160 },
+  big:     { color: 0xd32f2f, scale: 1.8,  hp: 2.6, speed: 0.75, dmg: 1.8, score: 250 },
+  boss:    { color: 0x3a1f5c, scale: 3.0,  hp: 1,   speed: 0.6,  dmg: 2.5, score: 2000 },
+};
+const eyeMat = new THREE.MeshBasicMaterial({ color: lin(0xff2a2a) });
+const eyeMatBoss = new THREE.MeshBasicMaterial({ color: lin(0xffd93b) });
+function makeMonsterModel(type) {
+  const t = MONSTER_TYPES[type];
+  const body = new THREE.MeshStandardMaterial({ color: lin(t.color), roughness: 0.6, emissive: 0x000000 });
+  const dark = mat(0x222222);
+  const root = new THREE.Group();
+  const legL = new THREE.Group(), legR = new THREE.Group(), wings = [], eyes = [];
+  if (type === "bat") {
+    root.add(cube(1.8, 1.6, 1.6, body, 0, 2.2, 0));
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Group();
+      w.position.set(sx * 0.9, 2.5, 0);
+      w.add(cube(2.4, 0.15, 1.4, mat(0x222233), sx * 1.2, 0, 0));
+      root.add(w); wings.push(w);
+    }
+    for (const sx of [-0.4, 0.4]) { const e = new THREE.Mesh(BOX, eyeMat); e.scale.set(0.35, 0.3, 0.1); e.position.set(sx, 2.4, 0.82); root.add(e); eyes.push(e); }
+    root.add(cube(0.15, 0.3, 0.05, basic(0xffffff), -0.25, 1.75, 0.82), cube(0.15, 0.3, 0.05, basic(0xffffff), 0.25, 1.75, 0.82));
+    root.userData = { legL, legR, body, wings, eyes };
+    return root;
+  }
+  legL.position.set(-0.5, 1.2, 0); legR.position.set(0.5, 1.2, 0);
+  legL.add(cube(0.7, 1.2, 0.7, dark, 0, -0.6, 0));
+  legR.add(cube(0.7, 1.2, 0.7, dark, 0, -0.6, 0));
+  root.add(legL, legR);
+  root.add(cube(2, 2, 1.6, body, 0, 2.2, 0));
+  root.add(cube(1.6, 1.4, 1.4, body, 0, 3.9, 0));
+  root.add(cube(1.6, 0.25, 0.3, dark, 0, 4.35, 0.62));
+  const em = type === "boss" ? eyeMatBoss : eyeMat;
+  for (const sx of [-0.4, 0.4]) { const e = new THREE.Mesh(BOX, em); e.scale.set(0.35, 0.3, 0.1); e.position.set(sx, 4.0, 0.72); root.add(e); eyes.push(e); }
+  if (type === "spitter") {
+    root.add(cube(0.9, 0.5, 0.1, basic(0x9dff3d), 0, 3.45, 0.72));
+    root.add(cube(1.2, 1.2, 0.8, mat(0x1c7a40), 0, 2.6, -1.1));
+  } else {
+    for (let i = -2; i <= 2; i++) root.add(cube(0.16, 0.2, 0.06, basic(0xffffff), i * 0.24, 3.45, 0.72));
+  }
+  root.add(cube(0.5, 0.5, 1.8, body, -1.25, 2.7, 0.8));
+  root.add(cube(0.5, 0.5, 1.8, body, 1.25, 2.7, 0.8));
+  if (type === "big" || type === "boss") {
+    root.add(cube(0.3, 0.8, 0.3, mat(0xeeeeee), -0.6, 5, 0));
+    root.add(cube(0.3, 0.8, 0.3, mat(0xeeeeee), 0.6, 5, 0));
+  }
+  if (type === "boss") {
+    const gold = mat(0xffc400);
+    root.add(cube(1.5, 0.3, 1.3, gold, 0, 4.75, 0));
+    for (const [x, z] of [[-0.6, 0.5], [0, 0.5], [0.6, 0.5], [-0.6, -0.5], [0.6, -0.5]]) root.add(cube(0.22, 0.45, 0.22, gold, x, 5.05, z));
+  }
+  root.userData = { legL, legR, body, wings, eyes };
+  return root;
+}
+const barBgMat = new THREE.MeshBasicMaterial({ color: lin(0x330000) });
+const barFgMat = new THREE.MeshBasicMaterial({ color: lin(0x4cff7a) });
+function makeHpBar() {
+  const g = new THREE.Group();
+  const bg = new THREE.Mesh(PLANE, barBgMat); bg.scale.set(2.6, 0.36, 1);
+  const fg = new THREE.Mesh(PLANE, barFgMat); fg.scale.set(2.4, 0.22, 1); fg.position.z = 0.01;
+  g.add(bg, fg);
+  g.userData.fg = fg;
+  scene.add(g);
+  return g;
+}
+
+// ======================================================================
+// EFFECTS
+// ======================================================================
+let particles = [];
+function spawnParticle(x, y, z, color, spd, size, life, gravity = 25) {
+  if (particles.length > 450) return;
+  const m = new THREE.Mesh(BOX, basic(color));
+  m.scale.setScalar(size);
+  m.position.set(x, y, z);
+  scene.add(m);
+  const a = Math.random() * Math.PI * 2, up = Math.random();
+  particles.push({ m, life, max: life, size, gravity, floor: 0.1,
+    vx: Math.cos(a) * spd * (1 - up * 0.5), vy: up * spd, vz: Math.sin(a) * spd * (1 - up * 0.5) });
+}
+function burst(x, y, z, color, n, spd = 10, size = 0.35) {
+  for (let i = 0; i < n; i++) spawnParticle(x, y, z, color, spd * rand(0.4, 1), size * rand(0.6, 1.3), rand(0.4, 0.8));
+}
+function dustRing(x, y, z, n, spd, color = 0xdddddd) {
+  for (let i = 0; i < n; i++) {
+    if (particles.length > 450) return;
+    const a = i / n * Math.PI * 2;
+    const m = new THREE.Mesh(BOX, basic(color));
+    const s = rand(0.3, 0.55);
+    m.scale.setScalar(s); m.position.set(x, y + 0.2, z);
+    scene.add(m);
+    particles.push({ m, life: 0.5, max: 0.5, size: s, gravity: 2, floor: y + 0.1, vx: Math.cos(a) * spd, vy: rand(0.5, 2), vz: Math.sin(a) * spd });
+  }
+}
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.life -= dt;
+    p.vy -= p.gravity * dt;
+    p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
+    if (p.m.position.y < p.floor) { p.m.position.y = p.floor; p.vy *= -0.3; p.vx *= 0.7; p.vz *= 0.7; }
+    p.m.rotation.x += dt * 6; p.m.rotation.y += dt * 4;
+    p.m.scale.setScalar(p.size * Math.max(0, p.life / p.max));
+  }
+  particles = particles.filter(p => { if (p.life <= 0) scene.remove(p.m); return p.life > 0; });
+}
+
+let rings = [];
+function ringFx(x, y, z, color, r0, r1, life, opacity = 0.85) {
+  const m = new THREE.Mesh(RING_GEO, glowMaterial(color, opacity));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, y, z);
+  scene.add(m);
+  rings.push({ m, life, max: life, r0, r1, op: opacity });
+}
+function updateRings(dt) {
+  for (const r of rings) {
+    r.life -= dt;
+    const k = 1 - Math.max(0, r.life / r.max);
+    const s = r.r0 + (r.r1 - r.r0) * (1 - (1 - k) * (1 - k));
+    r.m.scale.set(s, s, 1);
+    r.m.material.opacity = r.op * (1 - k);
+  }
+  rings = rings.filter(r => { if (r.life <= 0) { scene.remove(r.m); r.m.material.dispose(); } return r.life > 0; });
+}
+
+const streakMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
+let windStreaks = [];
+function updateWind(dt, p) {
+  if (phase === "play" && p.speed > 18) {
+    const n = Math.floor((p.speed - 15) / 8);
+    const dirx = Math.sin(p.heading), dirz = Math.cos(p.heading);
+    for (let i = 0; i < n; i++) {
+      const ahead = rand(6, 22), side = rand(-7, 7);
+      const m = new THREE.Mesh(BOX, streakMat);
+      m.position.set(p.x + dirx * ahead + dirz * side, p.y + rand(0.3, 6), p.z + dirz * ahead - dirx * side);
+      m.rotation.y = p.heading;
+      const len = 1 + p.speed * 0.08;
+      m.scale.set(0.05, 0.05, len);
+      scene.add(m);
+      windStreaks.push({ m, life: 0.3, len });
+    }
+  }
+  for (const w of windStreaks) { w.life -= dt; w.m.scale.z = w.len * Math.max(0, w.life / 0.3); }
+  windStreaks = windStreaks.filter(w => { if (w.life <= 0) scene.remove(w.m); return w.life > 0; });
+}
+
+let ghosts = [], ghostTimer = 0;
+function updateGhosts(dt, p) {
+  ghostTimer -= dt;
+  if (phase === "play" && (p.speed > 28 || p.dashTimer > 0 || p.slamming || p.boosting) && ghostTimer <= 0 && !firstPerson()) {
+    ghostTimer = 0.04;
+    const g = new THREE.Mesh(BOX, glowMaterial(p.boosting ? 0x3bf0ff : playerModel.userData.outfit.glow, 0.3));
+    g.scale.setScalar(PLAYER_H);
+    g.position.set(p.x, p.y + PLAYER_H / 2, p.z);
+    g.rotation.y = playerModel.rotation.y;
+    scene.add(g);
+    ghosts.push({ m: g, life: 0.25 });
+  }
+  for (const g of ghosts) { g.life -= dt; g.m.material.opacity = Math.max(0, g.life / 0.25) * 0.3; }
+  ghosts = ghosts.filter(g => { if (g.life <= 0) { scene.remove(g.m); g.m.material.dispose(); } return g.life > 0; });
+}
+
+// two-sided swing (front + back)
+const slashMat = glowMaterial(0xffffff, 0);
+const slash = new THREE.Group();
+const SLASH_GEO = new THREE.RingGeometry(1.8, 5, 32, 1, -Math.PI / 2 - 1.1, 2.2);
+const slashFront = new THREE.Mesh(SLASH_GEO, slashMat);
+slashFront.rotation.x = -Math.PI / 2;
+const slashBack = new THREE.Mesh(SLASH_GEO, slashMat);
+slashBack.rotation.x = -Math.PI / 2; slashBack.rotation.z = Math.PI;
+const slashWrap = new THREE.Group(); slashWrap.add(slashFront, slashBack);
+slash.add(slashWrap);
+scene.add(slash);
+let slashLife = 0, slashBig = 1;
+
+let popups = [];
+function popup(x, y, z, text, color, life = 1, huge = false) {
+  const el = document.createElement("div");
+  el.className = "pop" + (huge ? " huge" : ""); el.textContent = text; el.style.color = color;
+  $("popups").appendChild(el);
+  popups.push({ pos: new THREE.Vector3(x, y, z), el, life, max: life });
+}
+function updatePopups(dt) {
+  for (const p of popups) {
+    p.life -= dt; p.pos.y += dt * 2.5;
+    const v = p.pos.clone().project(camera);
+    if (v.z > 1) { p.el.style.display = "none"; continue; }
+    p.el.style.display = "";
+    p.el.style.left = (v.x + 1) / 2 * innerWidth + "px";
+    p.el.style.top = (1 - v.y) / 2 * innerHeight + "px";
+    p.el.style.opacity = Math.max(0, p.life / p.max);
+  }
+  popups = popups.filter(p => { if (p.life <= 0) p.el.remove(); return p.life > 0; });
+}
+function clearPopups() { popups.forEach(p => p.el.remove()); popups = []; }
+
+function flashEl(id, ms) {
+  const el = $(id);
+  el.style.transition = "none"; el.style.opacity = 1;
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = `opacity ${ms}ms`; el.style.opacity = 0; }));
+}
+function showBanner(html, ms = 1800) {
+  const b = $("banner");
+  b.innerHTML = html; b.style.opacity = 1;
+  clearTimeout(showBanner.t);
+  showBanner.t = setTimeout(() => b.style.opacity = 0, ms);
+}
+function showStreak() {
+  const s = $("streakText");
+  if (streak >= 2) {
+    const words = ["", "", "DOUBLE!", "TRIPLE!", "QUAD!", "RAMPAGE!", "UNSTOPPABLE!"];
+    s.textContent = `🔥 x${streak} ${words[streak] || "GODLIKE!"}`;
+    s.style.opacity = 1;
+  } else s.style.opacity = 0;
+}
+
+// ======================================================================
+// SOUND
+// ======================================================================
+let audio = null, muted = false;
+function initAudio() {
+  if (audio) return;
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const filter = ac.createBiquadFilter(); filter.type = "bandpass"; filter.Q.value = 0.8;
+    const gain = ac.createGain(); gain.gain.value = 0;
+    src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    src.start();
+    audio = { ac, filter, gain, buf };
+  } catch (e) { audio = null; }
+}
+
+// ---- background music (made in code): drums, bass and a little tune. Faster every level ----
+const BASS = [0, 0, 12, 0, 5, 5, 17, 5, 3, 3, 15, 3, 7, 7, 10, 12];
+const LEAD = [12, null, 15, 19, null, 15, 17, null, 19, null, 22, 19, 17, null, 15, null];
+let musicTimer = null, musicStep = 0, nextNoteTime = 0;
+function tone(freq, t, dur, type, vol) {
+  const { ac } = audio;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function playStep(i, t, step) {
+  if (muted || phase !== "play") return;
+  const { ac, buf } = audio, root = 55;
+  if (i % 4 === 0) { // kick
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    g.gain.setValueAtTime(0.16, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + 0.18);
+  }
+  if (i % 2 === 1) { // hi-hat
+    const s = ac.createBufferSource(); s.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 7000;
+    const g = ac.createGain(); g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t, Math.random()); s.stop(t + 0.06);
+  }
+  if (i % 8 === 4) { // clap
+    const s = ac.createBufferSource(); s.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1500;
+    const g = ac.createGain(); g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t, Math.random()); s.stop(t + 0.13);
+  }
+  tone(root * Math.pow(2, BASS[i] / 12), t, step * 0.9, "triangle", 0.08);
+  const boss_ = typeof boss !== "undefined" && boss;
+  if (LEAD[i] !== null) tone(root * 4 * Math.pow(2, (LEAD[i] + (boss_ ? -1 : 0)) / 12), t, step * 0.8, "square", boss_ ? 0.03 : 0.018);
+}
+function scheduleMusic() {
+  if (!audio) return;
+  const ac = audio.ac;
+  const bpm = 124 + Math.min(level || 1, 15) * 3;
+  const step = 60 / bpm / 2;
+  if (nextNoteTime < ac.currentTime) nextNoteTime = ac.currentTime + 0.05;
+  while (nextNoteTime < ac.currentTime + 0.12) {
+    playStep(musicStep, nextNoteTime, step);
+    nextNoteTime += step;
+    musicStep = (musicStep + 1) % 16;
+  }
+}
+function startMusic() {
+  if (!audio || musicTimer) return;
+  nextNoteTime = audio.ac.currentTime + 0.1;
+  musicTimer = setInterval(scheduleMusic, 25);
+}
+function blip(freq, dur, type = "square", vol = 0.08, slide = 0) {
+  if (!audio || muted) return;
+  const { ac } = audio, t = ac.currentTime;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur);
+}
+function updateWindSound(speed) {
+  if (!audio) return;
+  const t = audio.ac.currentTime;
+  const v = muted || phase !== "play" ? 0 : Math.min(0.2, Math.max(0, (speed - 8) / 45) * 0.2);
+  audio.gain.gain.setTargetAtTime(v, t, 0.1);
+  audio.filter.frequency.setTargetAtTime(250 + speed * 40, t, 0.1);
+}
+
+// ======================================================================
+// GAME STATE
+// ======================================================================
+let player, monsters = [], projectiles = [], pickups = [], waves = [];
+let phase = "menu";
+let level, timeLeft, alive, totalKills, streak, bestStreak, streakTimer, spawnTimer, perfects, score, starsGot;
+let bossSpawned = false, boss = null;
+let hiScore = 0;
+try { hiScore = +localStorage.getItem("speedSmashHi") || 0; } catch (e) {}
+let camYaw = 0.6, camPitch = 0.12, camDist = 14, shake = 0, hitstop = 0, timingClock = 0;
+let rmb = false, boostHeld = false;
+const keys = {};
+
+function newPlayer() {
+  player = {
+    x: 0, y: 0, z: 0, heading: 0, cur: 0, vy: 0, kx: 0, kz: 0, facing: 0,
+    hp: 100, hurtTimer: 0,
+    momentum: 0, idle: 0, boost: 1, boosting: false,
+    dashTimer: 0, dashCd: 0, airDash: true,
+    atkCd: 0, atkAnim: 0,
+    onGround: true, coyote: 0, jumpBuf: 0, jumpsUsed: 0, jumpCut: false,
+    flip: -1, slamming: false, slamGrade: "normal", squash: 0, lastVy: 0,
+    walk: 0, speed: 0, t: 0,
+  };
+}
+const firstPerson = () => camDist < 1.5;
+
+function removeMonster(m) {
+  scene.remove(m.mesh); scene.remove(m.bar);
+  m.mesh.userData.body.dispose();
+  if (m.tele) { scene.remove(m.tele); m.tele.material.dispose(); }
+}
+function clearAll() {
+  monsters.forEach(removeMonster); monsters = [];
+  projectiles.forEach(p => scene.remove(p.m)); projectiles = [];
+  pickups.forEach(p => scene.remove(p.m)); pickups = [];
+  waves.forEach(w => { scene.remove(w.m); w.m.material.dispose(); }); waves = [];
+  if (typeof corpses !== "undefined") { corpses.forEach(c => { scene.remove(c.m); c.m.userData.body.dispose(); }); corpses = []; }
+  boss = null;
+  $("bossBar").classList.add("hidden");
+}
+
+function buildLevel() {
+  buildMap(level);
+  clearAll();
+  Object.assign(player, { x: 0, y: 0, z: 0, cur: 0, vy: 0, kx: 0, kz: 0, momentum: 0, slamming: false, flip: -1, boost: 1 });
+  timeLeft = levelTime(level);
+  spawnTimer = 1.5;
+  bossSpawned = false;
+  starsGot = 0;
+}
+
+function findSpawn(minD, maxD) {
+  const p = player;
+  for (let i = 0; i < 40; i++) {
+    const a = Math.random() * Math.PI * 2, d = rand(minD, maxD);
+    const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+    if (Math.abs(x) > HALF - 4 || Math.abs(z) > HALF - 4) continue;
+    if (boxes.some(b => b.bottom < 5 && x > b.minX - 2 && x < b.maxX + 2 && z > b.minZ - 2 && z < b.maxZ + 2)) continue;
+    return { x, z };
+  }
+  return null;
+}
+
+function spawnMonster(forceType) {
+  let type = forceType;
+  if (!type) {
+    const pool = ["normal", "normal", "normal"];
+    if (level >= 2) pool.push("fast", "spitter");
+    if (level >= 3) pool.push("big", "fast");
+    if (level >= 4) pool.push("bat", "bat", "spitter");
+    if (level >= 6) pool.push("big", "bat");
+    type = pick(pool);
+  }
+  const s = findSpawn(30, 60);
+  if (!s) return;
+  const t = MONSTER_TYPES[type];
+  const mesh = makeMonsterModel(type);
+  mesh.scale.setScalar(t.scale);
+  scene.add(mesh);
+  let hp = Math.round((30 + level * 20) * t.hp);
+  if (type === "boss") hp = 250 + level * 220;
+  const m = {
+    type, mesh, bar: makeHpBar(), color: t.color,
+    x: s.x, y: type === "bat" ? 6 : 0, z: s.z, r: 1.1 * t.scale, h: 4.6 * t.scale,
+    hp, maxHp: hp,
+    speed: (4.5 + level * 1.0) * t.speed,
+    dmg: Math.round((10 + level * 3) * t.dmg),
+    hitCd: 0, walk: Math.random() * 6, flash: 0,
+    shootCd: rand(1.5, 3), stompCd: 3, teleTime: 0, tele: null, score: t.score,
+    // "alive" stuff: jumping, lunging, squashing, blinking
+    vy: 0, onGround: true, spawnT: 0.7, baseScale: t.scale, squash: 0, blinkT: rand(1, 4),
+    lungeCd: rand(1.5, 3.5), windup: 0, lungeT: 0, lvx: 0, lvz: 0, airMove: false,
+    leapCd: rand(1, 3), hopCd: 0, tilt: 0,
+  };
+  if (type === "bat") m.h = 3.2;
+  if (type === "boss") { m.speed = 4 + level * 0.5; m.bar.visible = false; boss = m; }
+  monsters.push(m);
+  // spawn portal: it climbs out of the floor
+  ringFx(s.x, 0.1, s.z, 0xff3b3b, 0.5, 4, 0.7);
+  ringFx(s.x, 0.12, s.z, 0x220033, 3, 3.2, 0.7, 0.9);
+  burst(s.x, 0.5, s.z, 0x2a0040, 18, 6, 0.45);
+  if (Math.hypot(s.x - player.x, s.z - player.z) < 45) blip(140, 0.4, "sawtooth", 0.04, 0.6);
+}
+
+// dead monsters go flying before they pop
+let corpses = [];
+function killFly(m) {
+  scene.remove(m.bar);
+  if (m.tele) { scene.remove(m.tele); m.tele.material.dispose(); m.tele = null; }
+  const dx = m.x - player.x, dz = m.z - player.z, d = Math.hypot(dx, dz) || 1;
+  const pow = 10 + player.speed * 0.3;
+  corpses.push({ m: m.mesh, x: m.x, y: m.y, z: m.z, vx: dx / d * pow, vz: dz / d * pow, vy: 14 + player.speed * 0.15,
+    sx: rand(-12, 12), sz: rand(-12, 12), life: 0.65, color: m.color, h: m.h, big: m.type === "boss" || m.type === "big" });
+  m.mesh.userData.body.emissive.setScalar(0.6);
+}
+function updateCorpses(dt) {
+  for (const c of corpses) {
+    c.life -= dt;
+    c.vy -= 40 * dt;
+    c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt;
+    c.m.position.set(c.x, c.y, c.z);
+    c.m.rotation.x += c.sx * dt; c.m.rotation.z += c.sz * dt;
+    if (c.life <= 0) {
+      burst(c.x, c.y + c.h * 0.5, c.z, c.color, c.big ? 50 : 26, c.big ? 18 : 13, c.big ? 0.8 : 0.55);
+      burst(c.x, c.y + c.h * 0.5, c.z, 0xffffff, 12, 16, 0.25);
+      ringFx(c.x, c.y + c.h * 0.5, c.z, 0xffffff, 0.5, c.big ? 8 : 4, 0.3);
+      blip(c.big ? 90 : 240, 0.2, "square", 0.08, 0.3);
+      scene.remove(c.m);
+      c.m.userData.body.dispose();
+    }
+  }
+  corpses = corpses.filter(c => c.life > 0);
+}
+
+// ======================================================================
+// INPUT
+// ======================================================================
+addEventListener("keydown", e => {
+  keys[e.code] = true;
+  if (e.code === "Space") { e.preventDefault(); if (!e.repeat && player) player.jumpBuf = 0.13; }
+  if ((e.code === "ShiftLeft" || e.code === "ShiftRight") && phase === "play") tryDash();
+  if (e.code === "KeyH") $("howTo").classList.toggle("hidden");
+  if (e.code === "KeyM") muted = !muted;
+});
+addEventListener("keyup", e => {
+  keys[e.code] = false;
+  if (e.code === "Space" && player && player.vy > 6 && !player.jumpCut) { player.vy *= 0.5; player.jumpCut = true; }
+});
+addEventListener("blur", () => { for (const k in keys) keys[k] = false; rmb = false; boostHeld = false; });
+
+const bb = $("boostBtn");
+bb.addEventListener("pointerdown", e => { e.preventDefault(); boostHeld = true; });
+addEventListener("pointerup", () => { boostHeld = false; });
+bb.addEventListener("pointerleave", () => { boostHeld = false; });
+bb.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+canvas.addEventListener("mousedown", e => {
+  if (phase !== "play") return;
+  if (e.button === 2) rmb = true;
+  if (e.button === 0) {
+    if (firstPerson() && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+    attack();
+  }
+});
+addEventListener("mouseup", e => { if (e.button === 2) rmb = false; });
+addEventListener("mousemove", e => {
+  if (phase !== "play") return;
+  if (!rmb && document.pointerLockElement !== canvas) return;
+  camYaw -= e.movementX * 0.004;
+  const minP = firstPerson() ? -1.3 : -0.6;
+  camPitch = Math.max(minP, Math.min(1.35, camPitch + e.movementY * 0.004));
+});
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (phase !== "play") return;
+  camDist *= e.deltaY > 0 ? 1.15 : 0.87;
+  if (camDist < 2.5 && e.deltaY < 0) camDist = 0.5;
+  else if (camDist < 2.5) camDist = 2.5;
+  camDist = Math.max(0.5, Math.min(40, camDist));
+  if (!firstPerson() && document.pointerLockElement === canvas) document.exitPointerLock();
+}, { passive: false });
+
+function tryDash() {
+  const p = player;
+  if (p.dashCd > 0 || (!p.onGround && !p.airDash)) return;
+  if (!p.onGround) { p.airDash = false; p.vy = Math.max(p.vy, 4); }
+  p.dashTimer = DASH_TIME;
+  p.dashCd = DASH_COOLDOWN;
+  burst(p.x, p.y + 1.2, p.z, playerModel.userData.outfit.glow, 16, 9, 0.3);
+  blip(200, 0.35, "sawtooth", 0.06, 3);
+  shake = 0.1;
+}
+
+// ======================================================================
+// TIMING
+// ======================================================================
+function timingPos() { const t = (timingClock / TIMING_PERIOD) % 2; return t < 1 ? t : 2 - t; }
+function timingGrade() {
+  const off = Math.abs(timingPos() - 0.5);
+  if (off <= PERFECT_ZONE) return "perfect";
+  if (off <= GOOD_ZONE) return "good";
+  return "normal";
+}
+const gradeMult = g => g === "perfect" ? PERFECT_MULT : g === "good" ? GOOD_MULT : 1;
+function showTimingResult(text, color) {
+  const el = $("timingResult");
+  el.textContent = text; el.style.color = color;
+  clearTimeout(showTimingResult.t);
+  showTimingResult.t = setTimeout(() => el.textContent = "", 700);
+}
+function gradeFeedback(grade, x, y, z) {
+  if (grade === "perfect") {
+    perfects++; score += 50 * level;
+    showTimingResult("PERFECT! x2", "#ffd93b");
+    popup(x, y, z, "PERFECT!", "#ffd93b", 0.9, true);
+    hitstop = 0.07; shake = Math.max(shake, 0.25);
+    flashEl("perfectFlash", 400);
+    blip(880, 0.15, "triangle", 0.15); setTimeout(() => blip(1320, 0.25, "triangle", 0.12), 60);
+  } else if (grade === "good") {
+    showTimingResult("GOOD x1.4", "#3bd5ff");
+    shake = Math.max(shake, 0.15);
+    blip(520, 0.12, "triangle", 0.1);
+  } else {
+    showTimingResult("hit", "#ffffff");
+    shake = Math.max(shake, 0.1);
+    blip(260, 0.1, "square", 0.07, 0.6);
+  }
+}
+
+// ======================================================================
+// ATTACKS
+// ======================================================================
+function hitMonster(m, dmg, grade, fromX, fromZ, kbMul = 1) {
+  m.hp -= dmg;
+  m.flash = 0.12;
+  const dx = m.x - fromX, dz = m.z - fromZ, d = Math.hypot(dx, dz) || 1;
+  const kb = (3 + player.speed * 0.1) * (grade === "perfect" ? 1.6 : 1) * kbMul * (m.type === "boss" ? 0.2 : 1);
+  m.x += (dx / d) * kb; m.z += (dz / d) * kb;
+  // the monster reacts: squash, tilt back and get popped into the air
+  m.squash = 0.4; m.tilt = 0.6;
+  m.windup = 0; m.lungeT = 0;
+  if (m.type !== "boss" && m.type !== "bat") { m.vy = Math.max(m.vy, grade === "perfect" ? 14 : 8); m.onGround = false; }
+  const col = grade === "perfect" ? "#ffd93b" : grade === "good" ? "#3bd5ff" : "#ffffff";
+  popup(m.x, m.y + m.h + 1, m.z, "-" + dmg, col, 1, grade === "perfect");
+  burst(m.x, m.y + m.h * 0.55, m.z, 0xffffff, 8, 12, 0.25);
+  burst(m.x, m.y + m.h * 0.55, m.z, m.color, 6, 9, 0.35);
+  if (grade === "perfect") burst(m.x, m.y + m.h * 0.55, m.z, 0xffd93b, 16, 16, 0.3);
+}
+const verticalReach = m => Math.abs((player.y + PLAYER_H / 2) - (m.y + m.h / 2)) < m.h / 2 + 2.5;
+
+function attack() {
+  const p = player;
+  if (p.atkCd > 0) return;
+
+  if (!p.onGround && p.y - groundBelow(p.x, p.z, p.y) > 2.2 && !p.slamming) {
+    p.slamming = true;
+    p.slamGrade = timingGrade();
+    p.vy = SLAM_V;
+    p.flip = -1;
+    p.atkCd = ATTACK_COOLDOWN;
+    blip(600, 0.3, "sawtooth", 0.07, 0.2);
+    return;
+  }
+
+  if (p.speed < ATTACK_MIN_SPEED) {
+    popup(p.x, p.y + 4, p.z, "Run first! (WASD)", "#ffffff", 0.8);
+    p.atkCd = 0.3;
+    return;
+  }
+  p.atkCd = ATTACK_COOLDOWN;
+  p.atkAnim = 0.22;
+
+  const grade = timingGrade();
+  const dmg = Math.round(attackDamage(p.speed) * gradeMult(grade));
+  const ax = Math.sin(p.facing), az = Math.cos(p.facing);
+
+  slash.rotation.y = p.facing;
+  slashMat.color.set(grade === "perfect" ? 0xffd93b : p.speed > 30 ? 0xff4fd8 : 0x9fe8ff);
+  slashBig = grade === "perfect" ? 1.5 : 1;
+  slashLife = 0.2;
+
+  let hitAny = false;
+  for (const m of monsters) {
+    const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+    if (d > ATTACK_RANGE * slashBig + m.r) continue;
+    // FRONT or BACK (abs) — sides are not hit
+    if (d > 0.5 && Math.abs(dx * ax + dz * az) / d < ATTACK_CONE) continue;
+    if (!verticalReach(m)) continue;
+    hitAny = true;
+    hitMonster(m, dmg, grade, p.x, p.z);
+  }
+  // practice targets (front and back too)
+  for (const t of targets) {
+    if (t.down > 0) continue;
+    const dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz);
+    if (d > ATTACK_RANGE + 1.5 || p.y > 6) continue;
+    if (d > 0.5 && Math.abs(dx * ax + dz * az) / d < ATTACK_CONE) continue;
+    hitTarget(t);
+  }
+  if (hitAny) gradeFeedback(grade, p.x, p.y + 5, p.z);
+  else blip(400, 0.08, "sine", 0.04, 0.5);
+
+  if (!(hitAny && grade === "perfect")) p.momentum = Math.max(0, p.momentum - ATTACK_COST);
+}
+
+function doSlam() {
+  const p = player;
+  p.slamming = false;
+  const grade = p.slamGrade;
+  const radius = 7 + p.speed * 0.08 + (grade === "perfect" ? 2.5 : 0);
+  const dmg = Math.round(attackDamage(Math.max(p.speed, 22)) * 0.9 * gradeMult(grade));
+  ringFx(p.x, p.y + 0.1, p.z, grade === "perfect" ? 0xffd93b : playerModel.userData.outfit.glow, 1, radius, 0.45);
+  ringFx(p.x, p.y + 0.15, p.z, 0xffffff, 0.5, radius * 0.7, 0.3, 0.6);
+  dustRing(p.x, p.y, p.z, 24, 14);
+  shake = 0.4;
+  blip(90, 0.4, "sawtooth", 0.16, 0.4);
+  let hitAny = false;
+  for (const m of monsters) {
+    if (Math.hypot(m.x - p.x, m.z - p.z) > radius + m.r) continue;
+    if (Math.abs(m.y - p.y) > 6) continue;
+    hitAny = true;
+    hitMonster(m, dmg, grade, p.x, p.z, 2);
+  }
+  for (const t of targets) if (t.down <= 0 && Math.hypot(t.x - p.x, t.z - p.z) < radius && p.y < 6) hitTarget(t);
+  popup(p.x, p.y + 3.5, p.z, "SLAM!", "#ffffff", 0.8);
+  if (hitAny) gradeFeedback(grade, p.x, p.y + 5, p.z);
+}
+
+// ======================================================================
+// DAMAGE + PICKUPS
+// ======================================================================
+function hurtPlayer(dmg, fromX, fromZ, keepSpeed = 0) {
+  const p = player;
+  if (p.hurtTimer > 0) return;
+  p.hp -= dmg;
+  p.hurtTimer = 1;
+  streak = 0; showStreak();
+  popup(p.x, p.y + 4, p.z, "-" + dmg + " HP", "#ff3b3b");
+  burst(p.x, p.y + 1.2, p.z, 0xff3b3b, 12, 8, 0.3);
+  const dx = p.x - fromX, dz = p.z - fromZ, d = Math.hypot(dx, dz) || 1;
+  p.kx = (dx / d) * 18; p.kz = (dz / d) * 18;
+  p.momentum *= keepSpeed;
+  shake = 0.3;
+  blip(160, 0.3, "sawtooth", 0.12, 0.5);
+  flashEl("hurt", 600);
+}
+
+function dropPickup(x, y, z) {
+  const type = Math.random() < 0.55 ? "heart" : "bolt";
+  const m = type === "heart" ? new THREE.Mesh(BOX, basic(0xff3b5c)) : new THREE.Mesh(OCTA, basic(0x3bd5ff));
+  if (type === "heart") m.scale.setScalar(1.1);
+  scene.add(m);
+  pickups.push({ m, x, z, type, life: 14, t: Math.random() * 6, y: groundBelow(x, z, y + 0.5) });
+}
+
+// ======================================================================
+// UPDATE
+// ======================================================================
+function update(dt) {
+  const p = player;
+  alive += dt;
+  timeLeft -= dt;
+  timingClock += dt;
+  if (timeLeft <= 0) { finishLevel(); return; }
+
+  if (keys.ArrowLeft) camYaw += 2.2 * dt;
+  if (keys.ArrowRight) camYaw -= 2.2 * dt;
+
+  let ix = 0, iz = 0;
+  if (keys.KeyW || keys.ArrowUp) iz += 1;
+  if (keys.KeyS || keys.ArrowDown) iz -= 1;
+  if (keys.KeyA) ix -= 1;
+  if (keys.KeyD) ix += 1;
+  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let mx = fx * iz + rx * ix, mz = fz * iz + rz * ix;
+  const ml = Math.hypot(mx, mz);
+  const moving = ml > 0.01;
+  if (moving) { mx /= ml; mz /= ml; }
+
+  // ---- BOOST button ----
+  p.boosting = (keys.KeyE || boostHeld) && p.boost > 0 && moving;
+  if (p.boosting) {
+    p.boost = Math.max(0, p.boost - dt * BOOST_DRAIN);
+    p.momentum += dt;                       // also builds speed twice as fast
+    if (Math.random() < 0.8) spawnParticle(p.x - Math.sin(p.heading) * 1.4, p.y + rand(0.3, 2), p.z - Math.cos(p.heading) * 1.4, pick([0x3bf0ff, 0x9ff8ff, 0xffffff]), 3, 0.4, 0.35, -3);
+  } else p.boost = Math.min(1, p.boost + dt * BOOST_REFILL);
+
+  // ---- momentum ----
+  if (moving) { p.idle = 0; p.momentum += dt; }
+  else {
+    p.idle += dt;
+    if (p.idle > 0.15 && p.onGround) p.momentum = Math.max(0, p.momentum - dt * 8);
+  }
+  p.momentum = Math.min(p.momentum, MAX_BONUS / GROW);
+
+  p.dashTimer -= dt;
+  p.dashCd = Math.max(0, p.dashCd - dt);
+  p.atkCd = Math.max(0, p.atkCd - dt);
+  p.atkAnim = Math.max(0, p.atkAnim - dt);
+  let target = BASE_SPEED + Math.min(MAX_BONUS, p.momentum * GROW);
+  if (p.boosting) target += BOOST_ADD;
+  if (p.dashTimer > 0) target += DASH_BOOST;
+
+  // ---- steering keeps speed ----
+  if (moving) {
+    const want = Math.atan2(mx, mz);
+    const diff = wrapAngle(want - p.heading);
+    if (Math.abs(diff) > 2.6 || p.cur < 1) p.heading = want;
+    else p.heading += diff * Math.min(1, dt * (p.onGround ? 16 : 9));
+    p.cur += (target - p.cur) * Math.min(1, dt * 6);
+  } else if (p.dashTimer > 0) {
+    p.cur += (target - p.cur) * Math.min(1, dt * 10);
+  } else {
+    p.cur += (0 - p.cur) * Math.min(1, dt * (p.onGround ? 10 : 1.5));
+  }
+  if (p.dashTimer > 0 && !moving && p.cur < 1) p.heading = p.facing;
+
+  const decay = Math.exp(-dt * 6);
+  p.kx *= decay; p.kz *= decay;
+  p.x += (Math.sin(p.heading) * p.cur + p.kx) * dt;
+  p.z += (Math.cos(p.heading) * p.cur + p.kz) * dt;
+
+  // walls just stop you sliding through them — no crashing, you keep your speed
+  const c = collide(p, PLAYER_R, PLAYER_H, true);
+
+  // ---- JUMPING (up to 3 jumps) ----
+  p.jumpBuf -= dt;
+  if (p.onGround) p.coyote = 0.1; else p.coyote -= dt;
+  if (p.jumpBuf > 0 && !p.slamming) {
+    if ((p.onGround || p.coyote > 0) && p.jumpsUsed === 0) {
+      p.vy = JUMP_V; p.jumpsUsed = 1; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.jumpCut = false;
+      dustRing(p.x, p.y, p.z, 12, 6);
+      blip(330, 0.14, "sine", 0.06, 1.8);
+    } else if (!p.onGround && p.jumpsUsed < MAX_JUMPS) {
+      if (p.jumpsUsed === 0) p.jumpsUsed = 1; // walked off an edge: that counts as the first
+      p.jumpsUsed++;
+      p.vy = AIR_JUMP_V; p.jumpBuf = 0; p.jumpCut = false;
+      p.flip = 0;
+      const col = playerModel.userData.outfit.glow;
+      ringFx(p.x, p.y + 0.3, p.z, col, 0.5, 3.5, 0.35);
+      burst(p.x, p.y + 0.5, p.z, col, 10, 6, 0.25);
+      blip(420 + p.jumpsUsed * 120, 0.16, "sine", 0.06, 1.8);
+    }
+  }
+  let g = p.vy > 0 ? (keys.Space ? GRAV_UP : GRAV_UP * 1.5) : GRAV_DOWN;
+  if (p.slamming) { p.vy = SLAM_V; g = 0; }
+  p.vy = Math.max(-62, p.vy - g * dt);
+  p.lastVy = p.vy;
+  p.y += p.vy * dt;
+  if (p.y + PLAYER_H > c.ceil) {           // bonk your head on a platform
+    p.y = c.ceil - PLAYER_H;
+    if (p.vy > 0) { p.vy = 0; blip(150, 0.08, "square", 0.05); }
+  }
+  if (p.y <= c.gh) {
+    if (!p.onGround) landed(-p.lastVy);
+    p.y = c.gh; p.vy = 0; p.onGround = true; p.jumpsUsed = 0; p.airDash = true;
+  } else if (p.y > c.gh + 0.05) p.onGround = false;
+
+  // jump pads
+  for (const pad of pads) {
+    if (p.onGround && Math.abs(p.y - pad.y) < 0.6 && Math.hypot(p.x - pad.x, p.z - pad.z) < 2.4) {
+      p.vy = pad.superPad ? SUPER_PAD_V : PAD_V;
+      p.onGround = false; p.jumpsUsed = 1; p.jumpCut = true; p.flip = 0;
+      pad.pulse = 0.4;
+      const col = pad.superPad ? 0xff4fd8 : 0x7dff6a;
+      ringFx(pad.x, pad.y + 0.4, pad.z, col, 2, 7, 0.5);
+      burst(pad.x, pad.y + 0.5, pad.z, col, 20, 12, 0.3);
+      popup(p.x, p.y + 4, p.z, pad.superPad ? "SUPER BOING!" : "BOING!", pad.superPad ? "#ff9cf0" : "#7dff9f", 0.8);
+      blip(pad.superPad ? 160 : 220, 0.5, "sine", 0.12, 4);
+    }
+  }
+
+  p.speed = p.cur;
+  p.hurtTimer = Math.max(0, p.hurtTimer - dt);
+  if (firstPerson()) p.facing = Math.atan2(fx, fz);
+  else if (p.cur > 0.5) p.facing = p.heading;
+
+  if (p.onGround && p.speed > 16 && Math.random() < 0.7) {
+    spawnParticle(p.x - Math.sin(p.facing) * 1.2, p.y + 0.2, p.z - Math.cos(p.facing) * 1.2,
+      p.speed > 32 ? playerModel.userData.outfit.glow : 0xeeeeee, 3, 0.35, 0.4, 2);
+  }
+  if (p.slamming) spawnParticle(p.x, p.y + 1.2, p.z, playerModel.userData.outfit.glow, 3, 0.4, 0.3, -5);
+
+  if (streak > 0) {
+    streakTimer -= dt;
+    if (streakTimer <= 0) { streak = 0; showStreak(); }
+  }
+
+  spawnTimer -= dt;
+  if (spawnTimer <= 0 && monsters.length < maxMonsters(level) + (boss ? 1 : 0)) {
+    spawnMonster();
+    spawnTimer = Math.max(0.5, 2.2 - level * 0.2);
+  }
+  if (!bossSpawned && timeLeft <= levelTime(level) / 2) {
+    bossSpawned = true;
+    spawnMonster("boss");
+    if (boss) {
+      showBanner(`👑 BOSS INCOMING!<br><span style="font-size:24px">Jump over its shockwaves!</span>`, 2200);
+      $("bossBar").classList.remove("hidden");
+      blip(80, 1.0, "sawtooth", 0.15, 0.5);
+    }
+  }
+
+  updateMonsters(dt);
+  updateProjectiles(dt);
+  updateWaves(dt);
+  updatePickups(dt);
+  updateStars(dt);
+  updateTargets(dt);
+  updateBoostRings(dt);
+
+  if (p.hp <= 0) gameOver();
+}
+
+function landed(fallSpeed) {
+  const p = player;
+  p.flip = -1;
+  p.squash = Math.min(0.35, fallSpeed / 90);
+  if (p.slamming) { doSlam(); return; }
+  if (fallSpeed > 24) {
+    dustRing(p.x, p.y, p.z, 14, 8);
+    shake = Math.max(shake, fallSpeed * 0.004);
+    blip(120, 0.15, "sine", 0.08, 0.6);
+  }
+}
+
+function updateMonsters(dt) {
+  const p = player;
+  for (const m of monsters) {
+    const dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1;
+    let mvx = dx / d, mvz = dz / d;
+
+    if (m.type === "spitter") {
+      if (d < 14) { mvx = -mvx; mvz = -mvz; }
+      else if (d < 24) { const sx = -mvz, sz = mvx; mvx = sx * 0.7; mvz = sz * 0.7; }
+      m.shootCd -= dt;
+      if (m.shootCd <= 0 && d < 55) {
+        m.shootCd = Math.max(1.2, rand(2.2, 3.2) - level * 0.08);
+        const sy = m.y + m.h * 0.75;
+        const tx = p.x - m.x, ty = p.y + 1.2 - sy, tz = p.z - m.z, tl = Math.hypot(tx, ty, tz) || 1;
+        const pm = new THREE.Mesh(SPHERE, basic(0x9dff3d));
+        pm.position.set(m.x, sy, m.z);
+        scene.add(pm);
+        const spd = 20 + level;
+        projectiles.push({ m: pm, vx: tx / tl * spd, vy: ty / tl * spd, vz: tz / tl * spd, life: 4, dmg: m.dmg, ox: m.x, oz: m.z });
+        blip(300, 0.15, "square", 0.04, 0.5);
+      }
+    }
+
+    if (m.type === "bat") {
+      // bats fly up to wherever you are — even high places
+      const wantY = p.y + 0.5 + Math.sin(m.walk * 0.5) * 0.8;
+      m.y += (wantY - m.y) * Math.min(1, dt * 2);
+    }
+
+    // ---- LUNGE: crouch and flash red, then jump at you ----
+    const canLunge = m.type === "normal" || m.type === "fast" || m.type === "big";
+    m.lungeCd -= dt; m.leapCd -= dt; m.hopCd -= dt;
+    if (m.windup > 0) {
+      m.windup -= dt;
+      mvx = 0; mvz = 0;
+      if (m.windup <= 0) {
+        m.lungeT = 0.35;
+        const L = 22 + level * 1.2;
+        m.lvx = dx / d * L; m.lvz = dz / d * L;
+        m.vy = 6; m.onGround = false;
+        blip(110, 0.2, "sawtooth", 0.06, 1.8);
+      }
+    } else if (canLunge && m.lungeCd <= 0 && m.onGround && d < 10 && Math.abs(p.y - m.y) < 3) {
+      m.windup = 0.45;
+      m.lungeCd = rand(2.5, 4.5) - Math.min(1.2, level * 0.08);
+      popup(m.x, m.y + m.h + 2, m.z, "❗", "#ff3b3b", 0.5);
+    }
+    if (m.lungeT > 0) m.lungeT -= dt;
+
+    // ---- LEAP: if you're up high and close, they jump up after you ----
+    if (m.type !== "bat" && m.type !== "boss" && m.type !== "spitter" && m.onGround && m.leapCd <= 0 &&
+        p.y > m.y + 3 && d < 18 && m.windup <= 0) {
+      const rise = p.y - m.y + 2.5;
+      m.vy = Math.min(36, Math.sqrt(2 * 40 * rise));
+      const air = m.vy / 40 * 1.7;
+      const hs = Math.min(26, d / air);
+      m.lvx = dx / d * hs; m.lvz = dz / d * hs;
+      m.airMove = true; m.onGround = false;
+      m.leapCd = rand(2.5, 4.5);
+      m.squash = 0.3;
+      popup(m.x, m.y + m.h + 2, m.z, "⤴", "#ffffff", 0.5);
+      blip(180, 0.25, "sine", 0.05, 2);
+    }
+
+    if (m.type === "boss") {
+      m.stompCd -= dt;
+      if (m.teleTime > 0) {
+        m.teleTime -= dt;
+        mvx = 0; mvz = 0;
+        const k = 1 - m.teleTime / 0.9;
+        m.tele.scale.setScalar(2 + k * 8);
+        m.tele.material.opacity = 0.25 + k * 0.4;
+        if (m.teleTime <= 0) {
+          scene.remove(m.tele); m.tele.material.dispose(); m.tele = null;
+          const wm = new THREE.Mesh(WAVE_GEO, glowMaterial(0xff5a1f, 0.95));
+          wm.rotation.x = -Math.PI / 2; wm.position.set(m.x, 0.15, m.z);
+          scene.add(wm);
+          waves.push({ m: wm, x: m.x, z: m.z, r: 1, maxR: 38, speed: 24 + level, hit: false, dmg: 18 + level * 4 });
+          dustRing(m.x, 0, m.z, 30, 16, 0xff9a5a);
+          shake = Math.max(shake, 0.35);
+          blip(60, 0.6, "sawtooth", 0.18, 0.5);
+        }
+      } else if (m.stompCd <= 0 && d < 45) {
+        m.stompCd = Math.max(2.6, 4.6 - level * 0.2);
+        m.teleTime = 0.9;
+        m.tele = new THREE.Mesh(DISC_GEO, glowMaterial(0xff2a2a, 0.3));
+        m.tele.rotation.x = -Math.PI / 2; m.tele.position.set(m.x, 0.08, m.z);
+        scene.add(m.tele);
+      }
+    }
+
+    if (m.spawnT > 0) { m.spawnT -= dt; continue; }   // still climbing out of the floor
+
+    if (m.lungeT > 0 || m.airMove) { m.x += m.lvx * dt; m.z += m.lvz * dt; }
+    else { m.x += mvx * m.speed * dt; m.z += mvz * m.speed * dt; }
+    if (m.type === "bat") {
+      const lim = HALF - m.r;
+      m.x = Math.max(-lim, Math.min(lim, m.x)); m.z = Math.max(-lim, Math.min(lim, m.z));
+    } else {
+      const mc = collide(m, m.r, m.h, true);
+      // blocked by a wall? hop!
+      if (mc.wall && m.onGround && m.hopCd <= 0) { m.vy = 15; m.onGround = false; m.hopCd = 0.9; m.squash = 0.25; }
+      // gravity, landing on things
+      m.vy -= 40 * dt;
+      m.y += m.vy * dt;
+      if (m.y + m.h > mc.ceil) { m.y = mc.ceil - m.h; m.vy = Math.min(m.vy, 0); }
+      if (m.y <= mc.gh) {
+        if (!m.onGround && m.vy < -8) { m.squash = Math.min(0.4, -m.vy / 60); dustRing(m.x, mc.gh, m.z, 8, 5); }
+        m.y = mc.gh; m.vy = 0; m.onGround = true; m.airMove = false;
+      } else if (m.y > mc.gh + 0.05) m.onGround = false;
+    }
+    m.hitCd = Math.max(0, m.hitCd - dt);
+    m.flash = Math.max(0, m.flash - dt);
+    m.walk += dt * m.speed * 1.3;
+
+    const hd = Math.hypot(p.x - m.x, p.z - m.z);
+    if (hd < PLAYER_R + m.r && p.y < m.y + m.h && p.y + PLAYER_H > m.y && m.hitCd <= 0) {
+      m.hitCd = 0.4;
+      if (p.dashTimer > 0) {
+        // DASH through monsters to hurt them
+        hitMonster(m, Math.round(attackDamage(p.speed) * 0.7), "normal", p.x, p.z, 1.5);
+        popup(m.x, m.y + m.h + 2, m.z, "DASH HIT!", "#ff7af5", 0.6);
+        shake = Math.max(shake, 0.15);
+        blip(300, 0.1, "square", 0.07, 0.5);
+      } else if (m.lungeT > 0 || p.speed < SAFE_SPEED || m.type === "boss") {
+        hurtPlayer(m.dmg, m.x, m.z, m.lungeT > 0 ? 0.5 : 0);
+        m.lungeT = 0;
+      } else { m.x -= (dx / d) * 2; m.z -= (dz / d) * 2; }
+    }
+  }
+
+  for (let i = monsters.length - 1; i >= 0; i--) {
+    const m = monsters[i];
+    if (m.hp > 0) continue;
+    killFly(m);
+    monsters.splice(i, 1);
+    const isBoss = m.type === "boss";
+    totalKills++;
+    streak++; streakTimer = STREAK_WINDOW;
+    bestStreak = Math.max(bestStreak, streak);
+    showStreak();
+    const pts = Math.round(m.score * level * (1 + streak * 0.1));
+    score += pts;
+    if (streak >= 3) player.hp = Math.min(100, player.hp + 4);
+    popup(m.x, m.y + m.h, m.z, `💥 KO! +${pts}`, "#ffd93b");
+    blip(180, 0.3, "square", 0.08, 0.3);
+    if (isBoss) {
+      boss = null;
+      $("bossBar").classList.add("hidden");
+      showBanner(`👑 BOSS DEFEATED!<br><span style="font-size:24px">+${pts} · +30 HP</span>`, 2200);
+      player.hp = Math.min(100, player.hp + 30);
+      ringFx(m.x, 0.2, m.z, 0xffd93b, 2, 30, 0.8);
+      shake = 0.5;
+      for (let k = 0; k < 3; k++) dropPickup(m.x + rand(-4, 4), 0, m.z + rand(-4, 4));
+    } else if (Math.random() < 0.25) dropPickup(m.x, m.y, m.z);
+  }
+}
+
+function updateProjectiles(dt) {
+  const p = player;
+  for (const pr of projectiles) {
+    pr.life -= dt;
+    pr.m.position.x += pr.vx * dt; pr.m.position.y += pr.vy * dt; pr.m.position.z += pr.vz * dt;
+    const q = pr.m.position;
+    if (Math.random() < 0.5) spawnParticle(q.x, q.y, q.z, 0x9dff3d, 1, 0.25, 0.3, 0);
+    if (Math.hypot(q.x - p.x, q.y - (p.y + 1.2), q.z - p.z) < 1.7) { hurtPlayer(pr.dmg, pr.ox, pr.oz, 0.6); pr.life = 0; }
+    if (q.y < 0.2 || Math.abs(q.x) > HALF || Math.abs(q.z) > HALF || insideBox(q.x, q.y, q.z)) pr.life = 0;
+    if (pr.life <= 0) burst(q.x, q.y, q.z, 0x9dff3d, 8, 6, 0.25);
+  }
+  projectiles = projectiles.filter(pr => { if (pr.life <= 0) scene.remove(pr.m); return pr.life > 0; });
+}
+
+function updateWaves(dt) {
+  const p = player;
+  for (const w of waves) {
+    w.r += w.speed * dt;
+    w.m.scale.set(w.r, w.r, 1);
+    w.m.material.opacity = 0.95 * (1 - w.r / w.maxR);
+    if (Math.random() < 0.8) {
+      const a = Math.random() * Math.PI * 2;
+      spawnParticle(w.x + Math.cos(a) * w.r, 0.3, w.z + Math.sin(a) * w.r, 0xff9a5a, 3, 0.4, 0.3, 5);
+    }
+    const d = Math.hypot(p.x - w.x, p.z - w.z);
+    if (!w.hit && p.y < 0.9 && Math.abs(d - w.r) < 1.5) { w.hit = true; hurtPlayer(w.dmg, w.x, w.z, 0.5); }
+  }
+  waves = waves.filter(w => { if (w.r >= w.maxR) { scene.remove(w.m); w.m.material.dispose(); return false; } return true; });
+}
+
+function updatePickups(dt) {
+  const p = player;
+  for (const k of pickups) {
+    k.life -= dt; k.t += dt;
+    k.m.position.set(k.x, k.y + 1.3 + Math.sin(k.t * 3) * 0.3, k.z);
+    k.m.rotation.y += dt * 3;
+    if (k.type === "heart") k.m.rotation.z = Math.PI / 4;
+    k.m.visible = k.life > 3 || Math.floor(k.life * 6) % 2 === 0;
+    if (Math.hypot(p.x - k.x, p.z - k.z) < 2.6 && Math.abs(p.y - k.y) < 3) {
+      k.life = 0;
+      if (k.type === "heart") { p.hp = Math.min(100, p.hp + 15); popup(p.x, p.y + 4, p.z, "+15 HP", "#7dff9f"); }
+      else { p.momentum = Math.min(MAX_BONUS / GROW, p.momentum + 2.5); p.dashCd = 0; p.boost = 1; popup(p.x, p.y + 4, p.z, "⚡ SPEED + BOOST!", "#3bd5ff"); }
+      burst(k.x, k.y + 1.3, k.z, k.type === "heart" ? 0xff3b5c : 0x3bd5ff, 12, 7, 0.3);
+      blip(660, 0.12, "triangle", 0.1, 1.5);
+    }
+  }
+  pickups = pickups.filter(k => { if (k.life <= 0) scene.remove(k.m); return k.life > 0; });
+}
+
+function hitTarget(t) {
+  t.down = 5; t.wobble = 1;
+  const pts = 50 * level;
+  score += pts;
+  player.boost = Math.min(1, player.boost + 0.15);
+  popup(t.x, 5.5, t.z, `🎯 +${pts}`, "#ff6b5b", 0.9);
+  burst(t.x, 3.6, t.z, 0xe8322e, 10, 9, 0.3);
+  burst(t.x, 3.6, t.z, 0xffffff, 8, 9, 0.25);
+  blip(1200, 0.15, "triangle", 0.1, 0.7);
+}
+function updateTargets(dt) {
+  for (const t of targets) {
+    if (t.down > 0) {
+      t.down -= dt;
+      const k = t.down > 4.6 ? 1 - (t.down - 4.6) / 0.4 : t.down < 0.4 ? t.down / 0.4 : 1; // fold down, then pop back up
+      t.m.scale.set(1, 1, 1 - k * 0.92);
+      if (t.down <= 0) { t.m.scale.set(1, 1, 1); t.wobble = 1; }
+    }
+    t.wobble = Math.max(0, t.wobble - dt * 2);
+    t.m.position.y = 3.6 + Math.sin(t.wobble * 20) * t.wobble * 0.3;
+  }
+}
+let ringChain = 0, ringChainT = 0;
+function updateBoostRings(dt) {
+  const p = player;
+  ringChainT -= dt;
+  if (ringChainT <= 0) ringChain = 0;
+  for (const r of boostRings) {
+    r.cd = Math.max(0, r.cd - dt);
+    r.m.material = r.cd > 0 ? boostRingOffMat : boostRingMat;
+    const dx = p.x - r.x, dy = p.y + 1.2 - r.y, dz = p.z - r.z;
+    const along = dx * r.nx + dy * r.ny + dz * r.nz;
+    const side = Math.sign(along);
+    // went through the ring?
+    if (r.cd <= 0 && r.side !== 0 && side !== r.side) {
+      const px = dx - along * r.nx, py = dy - along * r.ny, pz = dz - along * r.nz;
+      if (Math.hypot(px, py, pz) < 2.8) {
+        r.cd = 3;
+        ringChain++; ringChainT = 4;
+        const pts = 25 * level * ringChain;
+        score += pts;
+        p.boost = Math.min(1, p.boost + 0.4);
+        p.momentum = Math.min(MAX_BONUS / GROW, p.momentum + 1.5);
+        popup(r.x, r.y + 3.5, r.z, ringChain > 1 ? `RING x${ringChain}! +${pts}` : `+BOOST +${pts}`, "#3bf0ff", 0.9);
+        ringFx(r.x, r.y, r.z, 0x3bf0ff, 2.6, 6, 0.35);
+        burst(r.x, r.y, r.z, 0x3bf0ff, 14, 8, 0.25);
+        blip(600 + ringChain * 90, 0.18, "triangle", 0.1, 1.5);
+      }
+    }
+    if (Math.abs(along) < 6) r.side = side; else r.side = 0;
+  }
+}
+
+function updateStars(dt) {
+  const p = player;
+  for (const s of stars) {
+    if (s.got) continue;
+    if (Math.hypot(p.x - s.x, p.z - s.z) < 2.8 && Math.abs(p.y - s.y) < 3.5) {
+      s.got = true; starsGot++;
+      world.remove(s.m); world.remove(s.ring);
+      const pts = 300 * level;
+      score += pts;
+      p.hp = Math.min(100, p.hp + 10);
+      popup(s.x, s.y + 3, s.z, `⭐ STAR! +${pts}`, "#ffd93b", 1.2, true);
+      burst(s.x, s.y + 1.5, s.z, 0xffd93b, 24, 10, 0.35);
+      ringFx(s.x, s.y + 0.2, s.z, 0xffd93b, 1, 6, 0.5);
+      blip(990, 0.12, "triangle", 0.12); setTimeout(() => blip(1480, 0.3, "triangle", 0.1), 90);
+    }
+  }
+}
+
+function finishLevel() {
+  phase = "teleport";
+  rmb = false;
+  document.exitPointerLock();
+  const bonus = 500 * level;
+  score += bonus;
+  showBanner(`SURVIVED LEVEL ${level}!<br><span style="font-size:24px">+${bonus} bonus</span>`, 1300);
+  $("flash").style.opacity = 1;
+  blip(440, 0.6, "triangle", 0.12, 3);
+  // confetti!
+  for (let i = 0; i < 6; i++) burst(player.x, player.y + 3, player.z, pick([0xff4d4d, 0x3b82ff, 0xffcc1a, 0x3ccf5a, 0xff6fb5, 0xffffff]), 14, 18, 0.35);
+  setTimeout(() => {
+    level++;
+    player.hp = Math.min(100, player.hp + 30);
+    buildLevel();
+    clearPopups();
+    $("flash").style.opacity = 0;
+    const sub = level <= MAX_MAP_LEVEL
+      ? `NEW AREA: ${AREA_NAMES[level - 1]} · map got bigger!`
+      : `Map is full size · monsters keep getting stronger!`;
+    showBanner(`LEVEL ${level}<br><span style="font-size:24px">${sub}<br>Survive ${levelTime(level)}s · +30 HP</span>`, 3000);
+    phase = "play";
+  }, 1400);
+}
+
+// ======================================================================
+// DRAW
+// ======================================================================
+const raycaster = new THREE.Raycaster();
+const tmpV = new THREE.Vector3(), headV = new THREE.Vector3();
+const radarCtx = $("radar").getContext("2d");
+
+function drawRadar() {
+  const g = radarCtx, S = 160, Cc = S / 2, scale = Cc / 70;
+  const p = player;
+  g.clearRect(0, 0, S, S);
+  g.save();
+  g.beginPath(); g.arc(Cc, Cc, Cc - 2, 0, Math.PI * 2); g.clip();
+  const cy = Math.cos(camYaw), sy = Math.sin(camYaw);
+  const toScreen = (x, z) => { const dx = x - p.x, dz = z - p.z; return [Cc + (dx * cy - dz * sy) * scale, Cc + (dx * sy + dz * cy) * scale]; };
+  g.strokeStyle = "rgba(255,255,255,0.6)"; g.lineWidth = 2;
+  g.beginPath();
+  corners(HALF).forEach(([x, z], i) => { const [a, b] = toScreen(x, z); i ? g.lineTo(a, b) : g.moveTo(a, b); });
+  g.closePath(); g.stroke();
+  g.fillStyle = "rgba(255,255,255,0.18)";
+  for (const b of boxes) { const [bx, bz] = toScreen((b.minX + b.maxX) / 2, (b.minZ + b.maxZ) / 2); g.fillRect(bx - 1.5, bz - 1.5, 3, 3); }
+  for (const pad of pads) { const [x, y] = toScreen(pad.x, pad.z); g.fillStyle = pad.superPad ? "#ff4fd8" : "#7dff9f"; g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); }
+  g.fillStyle = "#ffd93b";
+  for (const s of stars) if (!s.got) { const [x, y] = toScreen(s.x, s.z); g.font = "11px sans-serif"; g.fillText("★", x - 4, y + 4); }
+  for (const k of pickups) { const [x, y] = toScreen(k.x, k.z); g.fillStyle = k.type === "heart" ? "#ff3b5c" : "#3bd5ff"; g.fillRect(x - 2, y - 2, 4, 4); }
+  for (const m of monsters) {
+    const [x, y] = toScreen(m.x, m.z);
+    g.fillStyle = m.type === "boss" ? "#ffd93b" : m.type === "spitter" ? "#9dff3d" : m.type === "bat" ? "#b38cff" : "#ff3b3b";
+    g.beginPath(); g.arc(x, y, m.type === "boss" ? 6 : m.type === "big" ? 4 : 3, 0, 7); g.fill();
+  }
+  g.restore();
+  g.save(); g.translate(Cc, Cc); g.rotate(-(p.facing - camYaw) + Math.PI);
+  g.fillStyle = "#ffffff";
+  g.beginPath(); g.moveTo(0, -7); g.lineTo(5, 6); g.lineTo(0, 3); g.lineTo(-5, 6); g.closePath(); g.fill();
+  g.restore();
+}
+
+function updateVisuals(dt) {
+  const p = player;
+  if (!p) return;
+  p.t += dt;
+
+  // ---- the block's animation ----
+  playerModel.position.set(p.x, p.y, p.z);
+  const diff = wrapAngle(p.facing - playerModel.rotation.y);
+  playerModel.rotation.y += diff * Math.min(1, dt * 15);
+  const u = playerModel.userData;
+  const fast = Math.min(1, p.speed / 40);
+  p.squash = Math.max(0, p.squash - dt * 2);
+  p.walk += dt * (p.speed * 0.9 + 0.01);
+  let sx = 1 + p.squash * 0.5, sy = 1 - p.squash;
+  if (!p.onGround && p.vy > 4 && !p.slamming) { sx = 0.9; sy = 1.12; }      // stretch going up
+  u.body.scale.set(sx, sy, sx);
+  const hop = p.onGround ? Math.abs(Math.sin(p.walk)) * 0.35 * Math.min(1, p.speed / 10) : 0;
+  u.body.position.y = PLAYER_H / 2 * sy + hop;
+  let rotX = fast * 0.3, rotY = 0;
+  if (p.flip >= 0) { p.flip += dt / 0.45; rotX = Math.min(1, p.flip) * Math.PI * 2; if (p.flip >= 1) p.flip = -1; }
+  if (p.slamming) rotX = Math.PI / 4;
+  if (p.atkAnim > 0) rotY = (1 - p.atkAnim / 0.22) * Math.PI * 2;         // spin attack (front + back)
+  if (phase === "menu") { rotX = 0; u.body.position.y = PLAYER_H / 2 + Math.abs(Math.sin(p.t * 2.5)) * 0.4; }
+  u.body.rotation.set(rotX, rotY, -diff * 0.4 * fast);
+  // face
+  const hurt = p.hurtTimer > 0.5;
+  u.hurtFace.visible = hurt;
+  u.eyes.visible = !hurt;
+  u.fastFace.visible = !hurt && (p.speed > 25 || p.boosting || p.slamming);
+  u.smile.visible = !hurt && !u.fastFace.visible;
+  const blink = p.hurtTimer > 0 && Math.floor(p.hurtTimer * 10) % 2 === 0;
+  playerModel.visible = !blink && !firstPerson() && phase !== "over";
+
+  for (const m of monsters) {
+    const ud = m.mesh.userData;
+    // climbing out of the floor when they spawn
+    const rise = m.spawnT > 0 ? -(m.spawnT / 0.7) * m.h : 0;
+    const bob = m.onGround && m.type !== "bat" ? Math.abs(Math.sin(m.walk)) * 0.25 * m.baseScale : 0;
+    m.mesh.position.set(m.x, m.y + rise + bob, m.z);
+    m.mesh.rotation.y = Math.atan2(p.x - m.x, p.z - m.z);
+    // squash + stretch
+    m.squash = Math.max(0, m.squash - dt * 2.5);
+    m.tilt = Math.max(0, m.tilt - dt * 3);
+    let sqY = 1 - m.squash, sqX = 1 + m.squash * 0.5;
+    if (m.windup > 0) { sqY = 0.75; sqX = 1.15; }                       // crouch before lunging
+    if (!m.onGround && m.vy > 3 && m.type !== "bat") { sqY = 1.15; sqX = 0.9; }
+    m.mesh.scale.set(m.baseScale * sqX, m.baseScale * sqY, m.baseScale * sqX);
+    m.mesh.rotation.x = m.lungeT > 0 ? 0.5 : -m.tilt * 0.6;             // lean in when lunging, tilt back when hit
+    if (m.windup > 0) m.mesh.position.x += Math.sin(p.t * 60) * 0.12;    // shaking with anger
+    const s = Math.sin(m.walk) * (m.lungeT > 0 ? 1.2 : 0.7);
+    ud.legL.rotation.x = s; ud.legR.rotation.x = -s;
+    ud.wings.forEach((w, i) => w.rotation.z = (i ? 1 : -1) * Math.sin(p.t * 18) * 0.6);
+    // blinking
+    m.blinkT -= dt;
+    if (m.blinkT < 0) m.blinkT = rand(2, 5);
+    ud.eyes.forEach(e => e.scale.y = m.blinkT < 0.12 ? 0.04 : (m.windup > 0 ? 0.45 : 0.3));
+    const angry = m.windup > 0 ? 0.6 * Math.abs(Math.sin(p.t * 25)) : 0;
+    ud.body.emissive.setRGB(...(m.flash > 0 ? [0.9, 0.9, 0.9] : m.teleTime > 0 ? [0.4 * Math.abs(Math.sin(p.t * 30)), 0, 0] : [angry, 0, 0]));
+    if (m.type === "boss" && m.teleTime > 0) m.mesh.position.y += (1 - m.teleTime / 0.9) * 2;
+    m.bar.position.set(m.x, m.y + m.h + 0.8, m.z);
+    m.bar.quaternion.copy(camera.quaternion);
+    const ratio = Math.max(0, m.hp / m.maxHp);
+    m.bar.userData.fg.scale.x = 2.4 * ratio;
+    m.bar.userData.fg.position.x = -(1 - ratio) * 1.2;
+  }
+  if (boss) $("bossFill").style.width = Math.max(0, boss.hp / boss.maxHp * 100) + "%";
+
+  for (const pad of pads) {
+    pad.pulse = Math.max(0, pad.pulse - dt);
+    pad.arrow.position.y = 2 + Math.sin(p.t * 4 + pad.x) * 0.4 + pad.pulse * 6;
+    pad.arrow.rotation.y += dt * 2;
+    pad.top.scale.setScalar(2 + Math.sin(p.t * 6) * 0.1 + pad.pulse * 2);
+  }
+  for (const s of stars) if (!s.got) { s.m.rotation.y += dt * 2.5; s.m.position.y = s.y + 1.5 + Math.sin(p.t * 3 + s.x) * 0.3; }
+  for (const r of boostRings) { r.m.rotation.z += dt * (r.cd > 0 ? 4 : 1); r.m.scale.setScalar(r.cd > 0 ? 0.7 : 1 + Math.sin(p.t * 4 + r.x) * 0.05); }
+  if (phase === "play") for (const r of boostRings) r.m.parent.visible = Math.abs(r.x - p.x) < 120 && Math.abs(r.z - p.z) < 120;
+  for (const f of flags) { f.pivot.rotation.y = Math.sin(p.t * 2.2 + f.ph) * 0.5; f.f.rotation.y = Math.sin(p.t * 6 + f.ph) * 0.25; }
+  for (const c of clouds) { c.position.x += dt * 2.5; if (c.position.x > HALF + 80) c.position.x = -HALF - 80; }
+
+  slashLife -= dt;
+  slashMat.opacity = Math.max(0, slashLife / 0.2) * 0.85;
+  slash.visible = slashLife > 0;
+  slash.position.set(p.x, p.y + 1.2, p.z);
+  slashWrap.scale.setScalar(slashBig * (1 + (0.2 - Math.max(0, slashLife)) * 1.5));
+
+  // ---- camera ----
+  if (phase === "menu") {
+    p.facing += dt * 0.6;
+    camera.setViewOffset(innerWidth, innerHeight, -innerWidth * 0.2, 0, innerWidth, innerHeight);
+  } else camera.clearViewOffset();
+
+  headV.set(p.x, p.y + (firstPerson() ? 1.9 : 2.6), p.z);
+  const dir = tmpV.set(Math.sin(camYaw) * Math.cos(camPitch), Math.sin(camPitch), Math.cos(camYaw) * Math.cos(camPitch));
+  shake = Math.max(0, shake - dt);
+  let sh = shake * 1.5;
+  if (phase === "play" && p.speed > 32) sh += (p.speed - 32) * 0.004;
+  if (firstPerson()) {
+    camera.position.copy(headV);
+    camera.lookAt(headV.x - dir.x, headV.y - dir.y, headV.z - dir.z);
+  } else {
+    const want = phase === "menu" ? 8 : camDist + Math.min(6, p.speed * 0.1);
+    let d = want;
+    raycaster.set(headV, dir);
+    raycaster.far = want;
+    const hit = raycaster.intersectObjects(solidMeshes, false)[0];
+    if (hit) d = Math.max(1, hit.distance - 0.4);
+    camera.position.copy(headV).addScaledVector(dir, d);
+    if (camera.position.y < 0.6) camera.position.y = 0.6;
+    camera.lookAt(headV);
+  }
+  if (sh > 0) camera.position.add(new THREE.Vector3(rand(-sh, sh), rand(-sh, sh), rand(-sh, sh)));
+  sky.position.copy(camera.position);
+
+  const fov = 70 + Math.min(40, Math.max(0, p.speed - BASE_SPEED) * 0.7) + (p.boosting ? 6 : 0);
+  camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
+  camera.updateProjectionMatrix();
+
+  sun.position.set(p.x + 40, 90, p.z + 25);
+  sun.target.position.set(p.x, 0, p.z);
+
+  const playing = phase === "play";
+  const sl = $("speedLines");
+  sl.style.opacity = playing ? Math.max(0, Math.min(1, (p.speed - 20) / 22)) : 0;
+  sl.style.transform = `rotate(${Math.random() * 6}deg) scale(1.2)`;
+  $("vignette").style.opacity = playing ? Math.max(0, Math.min(1, (p.speed - 15) / 30)) : 0;
+  $("boostGlow").style.opacity = playing && p.boosting ? 1 : 0;
+
+  if (playing || phase === "teleport") {
+    $("hpFill").style.width = Math.max(0, p.hp) + "%";
+    $("hpFill").style.background = p.hp > 50 ? "linear-gradient(90deg,#2ecc71,#7dff9f)" : p.hp > 25 ? "linear-gradient(90deg,#f1a20f,#ffd93b)" : "linear-gradient(90deg,#c0392b,#ff5b4b)";
+    $("hpNum").textContent = Math.max(0, Math.ceil(p.hp));
+    const spCol = p.speed < SAFE_SPEED ? "#ff5b4b" : p.boosting ? "#3bf0ff" : p.speed > 32 ? "#ff4fd8" : "#3bd5ff";
+    $("speedNum").textContent = p.speed.toFixed(0);
+    $("speedNum").style.color = spCol;
+    $("speedNum").style.textShadow = `0 0 ${Math.min(30, p.speed * 0.6)}px ${spCol}`;
+    $("speedFill").style.width = Math.min(100, p.speed / TOP_SPEED * 100) + "%";
+    $("speedFill").style.background = p.speed < SAFE_SPEED ? "linear-gradient(90deg,#c0392b,#ff5b4b)"
+      : p.speed > 32 ? "linear-gradient(90deg,#c03bff,#ff4fd8)" : "linear-gradient(90deg,#1f8fff,#3bd5ff)";
+    $("boostFill").style.width = p.boost * 100 + "%";
+    bb.classList.toggle("on", p.boosting);
+    bb.classList.toggle("empty", p.boost <= 0.02);
+    $("atkFill").style.width = (1 - p.atkCd / ATTACK_COOLDOWN) * 100 + "%";
+    $("dashFill").style.width = (1 - p.dashCd / DASH_COOLDOWN) * 100 + "%";
+    const used = p.onGround ? 0 : Math.max(p.jumpsUsed, p.coyote > 0 ? 0 : 1);
+    ["j1", "j2", "j3"].forEach((id, i) => $(id).classList.toggle("used", used > i));
+    $("marker").style.left = timingPos() * 100 + "%";
+    $("scoreNum").textContent = score.toLocaleString();
+    $("hiNum").textContent = Math.max(hiScore, score).toLocaleString();
+    $("levelNum").textContent = level;
+    $("starNum").textContent = `${starsGot}/${stars.length}`;
+    $("killNum").textContent = totalKills;
+    $("streakNum").textContent = `${streak} (best ${bestStreak})`;
+    $("perfNum").textContent = perfects;
+    $("aliveNum").textContent = alive.toFixed(1);
+    $("timeLeft").textContent = Math.max(0, timeLeft).toFixed(1);
+    $("timer").style.borderColor = timeLeft < 10 ? "#4cff7a" : "#ffd93b";
+    drawRadar();
+  }
+  $("crosshair").style.display = firstPerson() && playing ? "block" : "none";
+}
+
+// ======================================================================
+// LOOP
+// ======================================================================
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (phase === "play") {
+    if (hitstop > 0) hitstop -= dt;
+    else update(dt);
+  }
+  updateVisuals(dt);
+  updateParticles(dt);
+  updateCorpses(dt);
+  updateRings(dt);
+  updateWind(dt, player);
+  updateGhosts(dt, player);
+  updatePopups(dt);
+  updateWindSound(player.speed);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  initAudio();
+  if (audio && audio.ac.state === "suspended") audio.ac.resume();
+  startMusic();
+  newPlayer();
+  level = 1; alive = 0; totalKills = 0; perfects = 0; score = 0;
+  streak = 0; bestStreak = 0; streakTimer = 0; timingClock = 0;
+  camYaw = 0; camPitch = 0.3; camDist = 14;
+  buildLevel();
+  clearPopups();
+  $("startScreen").classList.add("hidden");
+  $("overScreen").classList.add("hidden");
+  document.body.classList.remove("menu");
+  phase = "play";
+  showStreak();
+  showBanner(`LEVEL 1<br><span style="font-size:24px">${AREA_NAMES[0]} · survive ${levelTime(1)}s</span>`, 2600);
+}
+
+function gameOver() {
+  phase = "over";
+  rmb = false; boostHeld = false;
+  player.hp = 0;
+  document.exitPointerLock();
+  burst(player.x, player.y + 1.2, player.z, playerModel.userData.outfit.color, 30, 12, 0.5);
+  blip(300, 0.8, "sawtooth", 0.12, 0.2);
+  const newBest = score > hiScore;
+  if (newBest) { hiScore = score; try { localStorage.setItem("speedSmashHi", score); } catch (e) {} }
+  $("overStats").innerHTML =
+    (newBest ? `<b style="color:#ffd93b;font-size:24px">🏆 NEW BEST SCORE!</b><br>` : "") +
+    `Score: <b>${score.toLocaleString()}</b> (best ${hiScore.toLocaleString()})<br>` +
+    `You survived <b>${alive.toFixed(1)}s</b> in total<br>` +
+    `Reached <b>Level ${level}</b> (${Math.max(0, timeLeft).toFixed(1)}s were left)<br>` +
+    `Monsters destroyed: <b>${totalKills}</b> · Perfect hits: <b>${perfects}</b><br>` +
+    `Best kill streak: <b>${bestStreak}</b>`;
+  $("overScreen").classList.remove("hidden");
+  $("streakText").style.opacity = 0;
+  $("bossBar").classList.add("hidden");
+}
+
+$("startBtn").onclick = startGame;
+$("againBtn").onclick = startGame;
+
+// menu: your block bouncing in the middle of the range
+newPlayer(); level = 1; alive = 0; totalKills = 0; perfects = 0; score = 0; streak = 0; bestStreak = 0; timeLeft = 40; starsGot = 0;
+buildMap(1);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
