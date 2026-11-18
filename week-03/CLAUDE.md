@@ -7,7 +7,7 @@
 
 ## This week's rules
 - Build the pet in Python. Use PySide6-Essentials for the window, pynput to listen for keys, Pillow to cut the art, and PyInstaller to bundle it.
-- Never save or send which keys were pressed. Only count how many times.
+- The program may check which side of the keyboard a key is on to pick the paw, then forget it right away. Never save, show or send which keys were pressed. Only count how many times.
 
 ## How we work
 - Make a plan first and write it down before building.
