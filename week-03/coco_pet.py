@@ -31,7 +31,9 @@ POSES = ("up", "hit_left", "hit_right", "sleep")
 
 SOUNDS_DIR = os.path.join(BASE, "art", "sounds")
 SOUNDS = {"left": os.path.join(SOUNDS_DIR, "drum_low.wav"),
-          "right": os.path.join(SOUNDS_DIR, "drum_high.wav")}
+          "right": os.path.join(SOUNDS_DIR, "drum_high.wav"),
+          "snore": os.path.join(SOUNDS_DIR, "snore.wav"),
+          "wake": os.path.join(SOUNDS_DIR, "wake.wav")}
 
 # settings.json sits next to the program and holds ONLY: x, y, size, sound on/off.
 # Never anything about keys.
@@ -67,12 +69,12 @@ def save_settings(pos, size, sound):
         pass  # can't save? just use the defaults next time
 
 
-def play_drum(side):
-    """Play the drum for "left" or "right". Only the side decides the sound."""
+def play_sound(name):
+    """Play "left" / "right" (drums), "snore" or "wake". For drums, only the side decides."""
     if winsound is None:
         return
     try:
-        winsound.PlaySound(SOUNDS[side], winsound.SND_FILENAME | winsound.SND_ASYNC
+        winsound.PlaySound(SOUNDS[name], winsound.SND_FILENAME | winsound.SND_ASYNC
                            | winsound.SND_NODEFAULT)
     except RuntimeError:
         pass  # no sound device? COCO still drums silently
@@ -145,7 +147,7 @@ class Pet(QWidget):
         self.paw_timer.timeout.connect(lambda: self.set_pose("up"))
 
         self.sleep_timer = QTimer(self, singleShot=True, interval=SLEEP_AFTER_MS)
-        self.sleep_timer.timeout.connect(lambda: self.set_pose("sleep"))
+        self.sleep_timer.timeout.connect(self.fall_asleep)
         self.sleep_timer.start()
 
         settings = load_settings()
@@ -196,15 +198,21 @@ class Pet(QWidget):
     # ----- typing -----
     def on_key(self, side):
         self.count += 1
+        was_asleep = self.pose == "sleep"
         if side == "middle":
             side, self.next_middle = self.next_middle, (
                 "right" if self.next_middle == "left" else "left")
         self.set_pose("hit_left" if side == "left" else "hit_right")
         if self.sound_on:
-            play_drum(side)
+            play_sound("wake" if was_asleep else side)  # the waking press says "boing"
         self.paw_timer.start()
         self.sleep_timer.start()  # restart the 10-second countdown
         self.update()  # redraw the count
+
+    def fall_asleep(self):
+        self.set_pose("sleep")
+        if self.sound_on:
+            play_sound("snore")  # plays once, not over and over
 
     def set_pose(self, pose):
         if pose != self.pose:
