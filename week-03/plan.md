@@ -54,48 +54,87 @@ What changed from the plan while building:
 
 ### Step 1: Install the packages
 - Write `requirements.txt` and install the 4 packages with pip.
-- **What to check:** `python -c "import PySide6, pynput, PIL"` runs with no error. If a package doesn't support this Python version (3.15), **stop and ask** before trying anything else.
+- **What to check** (every answer must be yes):
+  - Did `pip install -r requirements.txt` finish without a red error? (If no because a package doesn't support Python 3.15, **stop and ask** before trying anything else.)
+  - Run `python -c "import PySide6, pynput, PIL"`. Does it print nothing?
 - **Commit:** "Step 1: add requirements.txt"
 
 ### Step 2: Clean and cut the picture
 - `cut_art.py` cuts `sheet.png` into 4 cells, turns the checkerboard transparent, and moves each COCO so the drum sits in exactly the same spot in all 4.
 - Save them as `art/poses/up.png`, `hit_left.png`, `hit_right.png` and `sleep.png`.
-- **What to check:** open the 4 pictures. No checkerboard and no white edges around the fur. Flipping between them, the drum and body don't jump.
+- **What to check** (every answer must be yes):
+  - Are there exactly 4 files in `art/poses/`: `up.png`, `hit_left.png`, `hit_right.png`, `sleep.png`?
+  - Open each one. Is the background see-through, with no checkerboard?
+  - Is the fur free of white edges?
+  - Are the eye shines, drum bolts and name tag solid, not see-through?
+  - Flip between the 4 pictures. Does the drum stay in the same spot?
 - **Commit:** "Step 2: cut COCO into 4 poses"
 
 ### Step 3: Show COCO on screen
 - A window with no frame and a see-through background, always on top, showing `up.png` at 250 px in the bottom-right corner above the taskbar.
-- **What to check:** only COCO is visible, with no box around it. It stays on top when another window is clicked. It doesn't cover the taskbar.
+- **What to check** (every answer must be yes):
+  - Run `python coco_pet.py`. Does COCO show up in the bottom-right corner?
+  - Is COCO the only thing you see, with no box, frame or background around it?
+  - Click another window (like Notepad). Is COCO still on top of it?
+  - Is the whole taskbar still visible below COCO?
 - **Commit:** "Step 3: show COCO in the corner"
 
 ### Step 4: Drag, remember the spot, right-click Quit
 - Drag with the left mouse button. Save only the x/y position in `settings.json` when I let go. Right-click opens a menu with "Quit".
-- **What to check:** drag COCO, quit, then start it again. It comes back in the same spot. `settings.json` contains only the position.
+- **What to check** (every answer must be yes):
+  - Hold the left mouse button on COCO and move the mouse. Does COCO follow?
+  - Right-click COCO. Does a menu with "Quit" appear?
+  - Click "Quit". Does COCO close?
+  - Start it again. Does COCO appear where you left it?
+  - Open `settings.json`. Does it hold only the x and y numbers and nothing else?
 - **Commit:** "Step 4: drag, remember position, quit menu"
 
 ### Step 5: Play the drum while typing
 - pynput listens for key presses. Each key is checked for its side (left / right / middle), then forgotten right away. The paw stays down for a short moment, then goes back up.
-- **What to check:** typing in Notepad: left keys use the left paw, right keys the right paw, and Space takes turns. Fast typing doesn't freeze it. **Privacy check:** search the code to confirm no key is printed, saved, or sent anywhere.
+- **What to check** (every answer must be yes). Type in Notepad while COCO is running:
+  - Press `A` a few times. Does the left paw hit the drum each time?
+  - Press `L` a few times. Does the right paw hit the drum each time?
+  - Press Space a few times. Do the paws take turns (left, right, left)?
+  - After you stop, does the paw go back up within a second?
+  - Mash keys fast for 10 seconds. Does COCO keep moving without freezing or closing?
+  - **Privacy check:** search `coco_pet.py` for `print`, `open(`, `write` and `socket`. Is each one unrelated to keys (no key is ever printed, saved or sent)?
 - **Commit:** "Step 5: COCO drums when I type"
 
 ### Step 6: Count bubble
 - A small bubble under COCO shows the number of key presses since it started.
-- **What to check:** the number goes up by 1 per key press, it's readable, and it starts at 0 after a restart.
+- **What to check** (every answer must be yes):
+  - Does the bubble show `0` right after COCO starts?
+  - Press any key 5 times. Does it show `5`?
+  - Can you read the number easily on both a light and a dark window behind it?
+  - Quit and start COCO again. Is it back to `0`?
 - **Commit:** "Step 6: add key count bubble"
 
 ### Step 7: Fall asleep
 - With no typing for 10 seconds, COCO shows `sleep.png`. Any key press wakes it up.
-- **What to check:** wait 10 seconds and it falls asleep. Press a key and it wakes up and hits the drum.
+- **What to check** (every answer must be yes):
+  - Stop typing and count to 8. Is COCO still awake?
+  - Keep waiting until about 12 seconds. Is COCO asleep now?
+  - Press one key. Does COCO wake up and hit the drum with that press?
+  - Does the count bubble go up by 1 for that key?
 - **Commit:** "Step 7: COCO dozes off after 10 seconds"
 
 ### Step 8: Bundle it into an .exe
 - Use PyInstaller to make one `.exe` with the pictures inside. Add `build/`, `dist/`, `*.spec` and `settings.json` to `.gitignore`.
-- **What to check:** double-click the `.exe` (with no terminal open). Everything from Steps 3–7 still works.
+- **What to check** (every answer must be yes):
+  - Is there a `COCO.exe` in `dist/`?
+  - Close every terminal, then double-click `COCO.exe`. Does COCO appear with no black terminal window?
+  - Go through the questions of Steps 3–7 again with the `.exe`. Is every answer still yes?
+  - Run `git status`. Is `COCO.exe` (and `build/`, `dist/`, `COCO.spec`, `settings.json`) left out of the list?
 - **Commit:** "Step 8: bundle COCO as an exe" (the .exe itself is not committed)
 
 ### Step 9: Final check
 - Go through every check again and update this plan if anything changed.
-- **What to check:** everything in "What to build" works. `git status` shows no build files.
+- **What to check** (every answer must be yes):
+  - Go through every row of the table in "What to build". Does COCO do each one?
+  - Is COCO 250 px, starting in the bottom-right corner?
+  - Is every question in Steps 1–8 still answered yes?
+  - Does this plan match what was built (anything that changed is written under "Status")?
+  - Run `git status`. Does it show no build files (`build/`, `dist/`, `*.spec`, `settings.json`)?
 - **Commit:** "Step 9: final check"
 
 ## What not to do
