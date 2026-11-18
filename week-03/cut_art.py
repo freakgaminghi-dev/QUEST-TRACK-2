@@ -56,31 +56,8 @@ def background_mask(img):
         if y > 0: q.append((x, y - 1))
         if y < h - 1: q.append((x, y + 1))
 
-    # holes of checkerboard closed in by COCO (e.g. between arm and head).
-    # A real hole has the checker's gray squares; eye shines are pure white.
-    seen = bytearray(w * h)
-    for sy in range(h):
-        for sx in range(w):
-            i0 = sy * w + sx
-            if bg[i0] or seen[i0] or not is_bg_like(px[sx, sy]):
-                continue
-            comp, gray = [], 0
-            q = deque([(sx, sy)])
-            seen[i0] = 1
-            while q:
-                x, y = q.popleft()
-                comp.append(y * w + x)
-                if min(px[x, y]) <= 249:
-                    gray += 1
-                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-                    if 0 <= nx < w and 0 <= ny < h:
-                        j = ny * w + nx
-                        if not seen[j] and not bg[j] and is_bg_like(px[nx, ny]):
-                            seen[j] = 1
-                            q.append((nx, ny))
-            if len(comp) >= 150 and gray / len(comp) >= 0.2:
-                for i in comp:
-                    bg[i] = 1
+    # Only the outside is background. White spots inside COCO's outline
+    # (eye shines, drum bolts, name tag) stay solid.
     return bg
 
 
