@@ -137,6 +137,65 @@ What changed from the plan while building:
   - Run `git status`. Does it show no build files (`build/`, `dist/`, `*.spec`, `settings.json`)?
 - **Commit:** "Step 9: final check"
 
+## Version 2: size option and drum sounds
+
+### What to add
+| What I do | What COCO does |
+|---|---|
+| Right-click → **Size** → Small / Medium / Large / Huge | COCO becomes **150 / 250 / 350 / 450 px**. Medium (250) is the default. |
+| Left paw hits the drum | A **low** drum sound plays |
+| Right paw hits the drum | A **high** drum sound plays |
+| Right-click → **Sound** (tick on / off) | Sounds play or stop. On is the default. |
+
+- When the size changes, COCO's **bottom-right corner stays where it is**, and it never goes off the screen.
+- COCO remembers the size and sound on/off for next time. `settings.json` now holds **x, y, size and sound**, and still never anything about keys.
+- The sound only depends on the side (left/right), never on which key.
+
+### How it's made
+- **Sound:** Python's built-in `winsound`. PySide6-Essentials has no sound module, and this way nothing new is installed.
+- **Drum sounds:** a new script `make_sounds.py` makes two short drum sounds from math (no downloaded files) and saves them as `art/sounds/drum_low.wav` and `art/sounds/drum_high.wav`. It runs once.
+- **Size:** the 4 poses are scaled from the original pictures each time the size changes, so they stay sharp.
+- The `.exe` command gets one more `--add-data "art/sounds;art/sounds"`.
+
+### Step 10: Make the drum sounds
+- Write `make_sounds.py` and run it.
+- **What to check** (every answer must be yes):
+  - Are there 2 files in `art/sounds/`: `drum_low.wav` and `drum_high.wav`?
+  - Double-click each one. Does it sound like a short drum hit (under half a second)?
+  - Is `drum_low.wav` clearly lower than `drum_high.wav`?
+- **Commit:** "Step 10: make drum sounds"
+
+### Step 11: Drum sounds while typing
+- Play the low sound for the left paw and the high sound for the right paw. Add a **Sound** tick in the right-click menu.
+- **What to check** (every answer must be yes):
+  - Press `A`. Do you hear the low drum?
+  - Press `L`. Do you hear the high drum?
+  - Press Space a few times. Do low and high take turns, matching the paws?
+  - Mash keys fast for 10 seconds. Does COCO keep moving without freezing?
+  - Right-click → Sound to turn it off. Is it silent when you type, while the paws still move?
+  - Quit and start again. Is Sound still off? (Turn it back on after.)
+- **Commit:** "Step 11: COCO's drum makes sounds"
+
+### Step 12: Size option
+- Add a **Size** menu with Small / Medium / Large / Huge. The count bubble stays under COCO at every size.
+- **What to check** (every answer must be yes):
+  - Right-click COCO. Is there a Size menu with 4 choices, and a dot next to the current one?
+  - Pick each size. Does COCO change to that size, still sharp and with no box around it?
+  - Does the bottom-right corner stay in the same spot when the size changes?
+  - With COCO in the bottom-right corner, pick Huge. Is all of COCO still on the screen, above the taskbar?
+  - Do drumming, the count bubble and sleeping still work at Small and at Huge?
+  - Quit and start again. Is it the size you picked last?
+  - Open `settings.json`. Does it hold only x, y, size and sound?
+- **Commit:** "Step 12: choose COCO's size"
+
+### Step 13: Bundle Version 2 and final check
+- Make the `.exe` again with the sounds inside.
+- **What to check** (every answer must be yes):
+  - Close every terminal and double-click `dist/COCO.exe`. Do you hear the drums when you type?
+  - Go through the questions of Steps 3–7 and 11–12 with the `.exe`. Is every answer still yes?
+  - Run `git status`. Does it show no build files (`build/`, `dist/`, `*.spec`, `settings.json`)?
+- **Commit:** "Step 13: bundle Version 2"
+
 ## What not to do
 - Never save or send which keys were pressed. Only count how many times.
 - Never save, show, print or send which keys were pressed. Only the side (left/right) is used, and only the count is shown.
