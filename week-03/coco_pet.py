@@ -7,12 +7,14 @@ import json
 import os
 import sys
 
-from PySide6.QtCore import QPoint, Qt
+from pynput import keyboard
+from PySide6.QtCore import QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 PET_SIZE = 250  # px
 MARGIN = 16     # gap from the screen edge
+PAW_DOWN_MS = 150  # how long a paw stays on the drum
 
 # where the pictures are (works for "python coco_pet.py" and for the bundled .exe)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +44,50 @@ def save_position(pos):
         pass  # can't save? just start in the corner next time
 
 
+# ----- which side of the keyboard? -----
+# Windows key codes. Split down the middle: T G B (and 5) are left, Y H N (and 6) are right.
+LEFT_KEYS = set(map(ord, "QWERTASDFGZXCVB12345"))
+RIGHT_KEYS = set(map(ord, "YUIOPHJKLNM67890")) | {
+    0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF,  # ; = , - . /
+    0xDB, 0xDC, 0xDD, 0xDE,              # [ \ ] '
+}
+
+
+def side_of(key):
+    """Return only "left", "right" or "middle". The key itself is never kept."""
+    vk = getattr(key, "vk", None)
+    if vk is None:  # special keys (Space, Enter, arrows...) keep their code in .value
+        vk = getattr(getattr(key, "value", None), "vk", None)
+    if vk in LEFT_KEYS:
+        return "left"
+    if vk in RIGHT_KEYS:
+        return "right"
+    return "middle"
+
+
+class KeyWatcher(QObject):
+    """Listens to the keyboard in the background.
+
+    PRIVACY: for each key press it works out the side, sends just that word
+    to the pet, and forgets the key. Keys are never printed, saved or sent.
+    """
+    pressed = Signal(str)  # "left" / "right" / "middle"
+
+    def __init__(self):
+        super().__init__()
+        self.listener = keyboard.Listener(on_press=self._on_press)
+        self.listener.daemon = True
+
+    def _on_press(self, key):
+        self.pressed.emit(side_of(key))
+
+    def start(self):
+        self.listener.start()
+
+    def stop(self):
+        self.listener.stop()
+
+
 class Pet(QWidget):
     def __init__(self):
         super().__init__()
@@ -58,6 +104,10 @@ class Pet(QWidget):
         self.pose = "up"
 
         self.drag_offset = None
+        self.next_middle = "left"  # middle keys take turns
+
+        self.paw_timer = QTimer(self, singleShot=True, interval=PAW_DOWN_MS)
+        self.paw_timer.timeout.connect(lambda: self.set_pose("up"))
 
         self.setFixedSize(PET_SIZE, PET_SIZE)
         saved = load_position()
@@ -75,6 +125,19 @@ class Pet(QWidget):
         area = QGuiApplication.primaryScreen().availableGeometry()  # without the taskbar
         self.move(area.right() - self.width() - MARGIN + 1,
                   area.bottom() - self.height() - MARGIN + 1)
+
+    # ----- typing -----
+    def on_key(self, side):
+        if side == "middle":
+            side, self.next_middle = self.next_middle, (
+                "right" if self.next_middle == "left" else "left")
+        self.set_pose("hit_left" if side == "left" else "hit_right")
+        self.paw_timer.start()
+
+    def set_pose(self, pose):
+        if pose != self.pose:
+            self.pose = pose
+            self.update()
 
     # ----- mouse: drag with left button, menu with right button -----
     def mousePressEvent(self, event):
@@ -105,7 +168,12 @@ def main():
     app = QApplication(sys.argv)
     pet = Pet()
     pet.show()
-    sys.exit(app.exec())
+    keys = KeyWatcher()
+    keys.pressed.connect(pet.on_key)
+    keys.start()
+    code = app.exec()
+    keys.stop()
+    sys.exit(code)
 
 
 if __name__ == "__main__":
