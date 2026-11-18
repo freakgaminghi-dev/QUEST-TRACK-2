@@ -14,10 +14,11 @@ except ImportError:
 
 from pynput import keyboard
 from PySide6.QtCore import QObject, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen, QPixmap
+from PySide6.QtGui import QActionGroup, QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
-PET_SIZE = 250  # px
+SIZES = {"Small": 150, "Medium": 250, "Large": 350, "Huge": 450}  # px
+DEFAULT_SIZE = 250
 MARGIN = 16     # gap from the screen edge
 PAW_DOWN_MS = 150  # how long a paw stays on the drum
 BUBBLE_H = 34      # height of the count bubble under COCO
@@ -32,7 +33,7 @@ SOUNDS_DIR = os.path.join(BASE, "art", "sounds")
 SOUNDS = {"left": os.path.join(SOUNDS_DIR, "drum_low.wav"),
           "right": os.path.join(SOUNDS_DIR, "drum_high.wav")}
 
-# settings.json sits next to the program and holds ONLY: x, y, sound on/off.
+# settings.json sits next to the program and holds ONLY: x, y, size, sound on/off.
 # Never anything about keys.
 APP_DIR = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
            else os.path.dirname(os.path.abspath(__file__)))
@@ -51,15 +52,17 @@ def load_settings():
     good = {}
     if isinstance(data.get("x"), int) and isinstance(data.get("y"), int):
         good["x"], good["y"] = data["x"], data["y"]
+    if data.get("size") in SIZES.values() and not isinstance(data.get("size"), bool):
+        good["size"] = data["size"]
     if isinstance(data.get("sound"), bool):
         good["sound"] = data["sound"]
     return good
 
 
-def save_settings(pos, sound):
+def save_settings(pos, size, sound):
     try:
         with open(SETTINGS, "w", encoding="utf-8") as f:
-            json.dump({"x": pos.x(), "y": pos.y(), "sound": sound}, f)
+            json.dump({"x": pos.x(), "y": pos.y(), "size": size, "sound": sound}, f)
     except OSError:
         pass  # can't save? just use the defaults next time
 
@@ -127,11 +130,10 @@ class Pet(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
+        # the full-size pictures; self.pics holds them scaled to the chosen size
+        self.originals = {name: QPixmap(os.path.join(POSES_DIR, name + ".png"))
+                          for name in POSES}
         self.pics = {}
-        for name in POSES:
-            pix = QPixmap(os.path.join(POSES_DIR, name + ".png"))
-            self.pics[name] = pix.scaled(PET_SIZE, PET_SIZE, Qt.KeepAspectRatio,
-                                         Qt.SmoothTransformation)
         self.pose = "up"
         self.count = 0  # key presses since COCO started (never saved)
         self.font = QFont("Segoe UI", 12, QFont.Bold)
@@ -148,8 +150,7 @@ class Pet(QWidget):
 
         settings = load_settings()
         self.sound_on = settings.get("sound", True)
-
-        self.setFixedSize(PET_SIZE, PET_SIZE + BUBBLE_H)
+        self.apply_size(settings.get("size", DEFAULT_SIZE))
         saved = QPoint(settings["x"], settings["y"]) if "x" in settings else None
         if saved is not None and self.fits_on_a_screen(saved):
             self.move(saved)
@@ -157,7 +158,30 @@ class Pet(QWidget):
             self.move_to_corner()
 
     def save(self):
-        save_settings(self.pos(), self.sound_on)
+        save_settings(self.pos(), self.pet_px, self.sound_on)
+
+    def apply_size(self, px):
+        """Scale the 4 poses from the full-size pictures and resize the window."""
+        self.pet_px = px
+        self.pics = {name: pix.scaled(px, px, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                     for name, pix in self.originals.items()}
+        self.setFixedSize(px, px + BUBBLE_H)
+        self.update()
+
+    def change_size(self, px):
+        """New size, keeping the bottom-right corner in place and COCO on the screen."""
+        if px == self.pet_px:
+            return
+        old = self.frameGeometry()
+        screen = QGuiApplication.screenAt(old.center()) or QGuiApplication.primaryScreen()
+        area = screen.availableGeometry()  # without the taskbar
+        self.apply_size(px)
+        x = old.right() + 1 - self.width()
+        y = old.bottom() + 1 - self.height()
+        x = max(area.left(), min(x, area.right() + 1 - self.width()))
+        y = max(area.top(), min(y, area.bottom() + 1 - self.height()))
+        self.move(x, y)
+        self.save()
 
     def fits_on_a_screen(self, pos):
         """Don't come back off-screen (e.g. a monitor was unplugged)."""
@@ -206,14 +230,25 @@ class Pet(QWidget):
         self.save()
 
     def contextMenuEvent(self, event):
+        self.build_menu().exec(event.globalPos())
+
+    def build_menu(self):
         menu = QMenu(self)
         sound = menu.addAction("Sound")
         sound.setCheckable(True)
         sound.setChecked(self.sound_on)
         sound.toggled.connect(self.toggle_sound)
+        size_menu = menu.addMenu("Size")
+        group = QActionGroup(size_menu)
+        for name, px in SIZES.items():
+            act = size_menu.addAction(f"{name} ({px} px)")
+            act.setCheckable(True)
+            act.setChecked(px == self.pet_px)
+            act.setActionGroup(group)
+            act.triggered.connect(lambda _=False, px=px: self.change_size(px))
         menu.addSeparator()
         menu.addAction("Quit", QApplication.quit)
-        menu.exec(event.globalPos())
+        return menu
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -227,7 +262,7 @@ class Pet(QWidget):
         w = max(56, QFontMetrics(self.font).horizontalAdvance(text) + 28)
         h = BUBBLE_H - 6
         x = (self.width() - w) / 2
-        y = PET_SIZE + 2
+        y = self.pet_px + 2
         p.setPen(QPen(QColor(0x3B, 0x24, 0x16), 3))
         p.setBrush(QColor(255, 250, 240))
         p.drawRoundedRect(x, y, w, h, h / 2, h / 2)
