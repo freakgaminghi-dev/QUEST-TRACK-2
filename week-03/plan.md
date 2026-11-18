@@ -39,6 +39,17 @@ week-03/
   art/poses/         up.png, hit_left.png, hit_right.png, sleep.png
 ```
 
+## How to run
+- From Python: `python coco_pet.py` (inside `week-03`)
+- As a program: `dist/COCO.exe`. Make it again with:
+  `python -m PyInstaller --onefile --windowed --name COCO --add-data "art/poses;art/poses" --noconfirm coco_pet.py`
+
+## Status: all 9 steps done (2026-11-18)
+What changed from the plan while building:
+- **Step 2:** the 4 cells were already lined up to within 1 px, so the "COCO jumps" worry was wrong. The script still lines them up by the drum.
+- **Step 4:** `.gitignore` was added here instead of in Step 8, so `settings.json` could never be committed by accident.
+- **Step 8:** the first `.exe` showed small see-through spots (eye shines, drum bolts, name tag). `cut_art.py` had treated those white spots as background. It now only removes the background from the outside edge, and all 4 poses have 0 holes.
+
 ## Steps
 
 ### Step 1: Install the packages
