@@ -196,6 +196,22 @@ What changed from the plan while building:
   - Run `git status`. Does it show no build files (`build/`, `dist/`, `*.spec`, `settings.json`)?
 - **Commit:** "Step 13: bundle Version 2"
 
+### Step 14: Sleep and wake sounds
+- `make_sounds.py` makes 2 more sounds from math: `art/sounds/snore.wav` (a soft, slow snore, about 1.5 seconds) and `art/sounds/wake.wav` (a short rising "boing", under half a second).
+- When COCO falls asleep, the snore plays **once** (not over and over).
+- The key press that wakes COCO plays the wake sound instead of a drum. COCO still hits the drum with that press, and the count still goes up by 1.
+- The **Sound** tick in the right-click menu turns these off too.
+- Test it with `python coco_pet.py`. The `.exe` is made again in Step 13 afterwards.
+- **What to check** (every answer must be yes):
+  - Are `snore.wav` and `wake.wav` in `art/sounds/`, next to the 2 drum sounds?
+  - Double-click `snore.wav`. Does it sound like a soft snore, not loud or scary?
+  - Double-click `wake.wav`. Is it a short rising sound, under half a second?
+  - Stop typing. When COCO falls asleep (about 10 seconds), do you hear the snore once and then silence?
+  - Press a key. Do you hear the wake sound, and does COCO hit the drum?
+  - Press more keys. Are they normal drum sounds again?
+  - Turn Sound off and let COCO sleep and wake. Is it silent both times?
+- **Commit:** "Step 14: COCO snores and wakes up with a sound"
+
 ## What not to do
 - Never save or send which keys were pressed. Only count how many times.
 - Never save, show, print or send which keys were pressed. Only the side (left/right) is used, and only the count is shown.
