@@ -9,12 +9,13 @@ import sys
 
 from pynput import keyboard
 from PySide6.QtCore import QObject, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 PET_SIZE = 250  # px
 MARGIN = 16     # gap from the screen edge
 PAW_DOWN_MS = 150  # how long a paw stays on the drum
+BUBBLE_H = 34      # height of the count bubble under COCO
 
 # where the pictures are (works for "python coco_pet.py" and for the bundled .exe)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -102,6 +103,8 @@ class Pet(QWidget):
             self.pics[name] = pix.scaled(PET_SIZE, PET_SIZE, Qt.KeepAspectRatio,
                                          Qt.SmoothTransformation)
         self.pose = "up"
+        self.count = 0  # key presses since COCO started (never saved)
+        self.font = QFont("Segoe UI", 12, QFont.Bold)
 
         self.drag_offset = None
         self.next_middle = "left"  # middle keys take turns
@@ -109,7 +112,7 @@ class Pet(QWidget):
         self.paw_timer = QTimer(self, singleShot=True, interval=PAW_DOWN_MS)
         self.paw_timer.timeout.connect(lambda: self.set_pose("up"))
 
-        self.setFixedSize(PET_SIZE, PET_SIZE)
+        self.setFixedSize(PET_SIZE, PET_SIZE + BUBBLE_H)
         saved = load_position()
         if saved is not None and self.fits_on_a_screen(saved):
             self.move(saved)
@@ -128,11 +131,13 @@ class Pet(QWidget):
 
     # ----- typing -----
     def on_key(self, side):
+        self.count += 1
         if side == "middle":
             side, self.next_middle = self.next_middle, (
                 "right" if self.next_middle == "left" else "left")
         self.set_pose("hit_left" if side == "left" else "hit_right")
         self.paw_timer.start()
+        self.update()  # redraw the count
 
     def set_pose(self, pose):
         if pose != self.pose:
@@ -161,7 +166,20 @@ class Pet(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.SmoothPixmapTransform)
+        p.setRenderHint(QPainter.Antialiasing)
         p.drawPixmap(0, 0, self.pics[self.pose])
+
+        # count bubble
+        text = f"{self.count:,}"
+        p.setFont(self.font)
+        w = max(56, QFontMetrics(self.font).horizontalAdvance(text) + 28)
+        h = BUBBLE_H - 6
+        x = (self.width() - w) / 2
+        y = PET_SIZE + 2
+        p.setPen(QPen(QColor(0x3B, 0x24, 0x16), 3))
+        p.setBrush(QColor(255, 250, 240))
+        p.drawRoundedRect(x, y, w, h, h / 2, h / 2)
+        p.drawText(int(x), int(y), int(w), int(h), Qt.AlignCenter, text)
 
 
 def main():
