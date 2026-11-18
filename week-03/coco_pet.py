@@ -7,6 +7,11 @@ import json
 import os
 import sys
 
+try:
+    import winsound  # built into Python on Windows
+except ImportError:
+    winsound = None
+
 from pynput import keyboard
 from PySide6.QtCore import QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen, QPixmap
@@ -23,27 +28,51 @@ BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 POSES_DIR = os.path.join(BASE, "art", "poses")
 POSES = ("up", "hit_left", "hit_right", "sleep")
 
-# settings.json sits next to the program and holds ONLY the window position
+SOUNDS_DIR = os.path.join(BASE, "art", "sounds")
+SOUNDS = {"left": os.path.join(SOUNDS_DIR, "drum_low.wav"),
+          "right": os.path.join(SOUNDS_DIR, "drum_high.wav")}
+
+# settings.json sits next to the program and holds ONLY: x, y, sound on/off.
+# Never anything about keys.
 APP_DIR = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
            else os.path.dirname(os.path.abspath(__file__)))
 SETTINGS = os.path.join(APP_DIR, "settings.json")
 
 
-def load_position():
+def load_settings():
+    """Read settings.json and keep only the values we know, if they look right."""
     try:
         with open(SETTINGS, encoding="utf-8") as f:
             data = json.load(f)
-        return QPoint(int(data["x"]), int(data["y"]))
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    good = {}
+    if isinstance(data.get("x"), int) and isinstance(data.get("y"), int):
+        good["x"], good["y"] = data["x"], data["y"]
+    if isinstance(data.get("sound"), bool):
+        good["sound"] = data["sound"]
+    return good
 
 
-def save_position(pos):
+def save_settings(pos, sound):
     try:
         with open(SETTINGS, "w", encoding="utf-8") as f:
-            json.dump({"x": pos.x(), "y": pos.y()}, f)
+            json.dump({"x": pos.x(), "y": pos.y(), "sound": sound}, f)
     except OSError:
-        pass  # can't save? just start in the corner next time
+        pass  # can't save? just use the defaults next time
+
+
+def play_drum(side):
+    """Play the drum for "left" or "right". Only the side decides the sound."""
+    if winsound is None:
+        return
+    try:
+        winsound.PlaySound(SOUNDS[side], winsound.SND_FILENAME | winsound.SND_ASYNC
+                           | winsound.SND_NODEFAULT)
+    except RuntimeError:
+        pass  # no sound device? COCO still drums silently
 
 
 # ----- which side of the keyboard? -----
@@ -117,12 +146,18 @@ class Pet(QWidget):
         self.sleep_timer.timeout.connect(lambda: self.set_pose("sleep"))
         self.sleep_timer.start()
 
+        settings = load_settings()
+        self.sound_on = settings.get("sound", True)
+
         self.setFixedSize(PET_SIZE, PET_SIZE + BUBBLE_H)
-        saved = load_position()
+        saved = QPoint(settings["x"], settings["y"]) if "x" in settings else None
         if saved is not None and self.fits_on_a_screen(saved):
             self.move(saved)
         else:
             self.move_to_corner()
+
+    def save(self):
+        save_settings(self.pos(), self.sound_on)
 
     def fits_on_a_screen(self, pos):
         """Don't come back off-screen (e.g. a monitor was unplugged)."""
@@ -141,6 +176,8 @@ class Pet(QWidget):
             side, self.next_middle = self.next_middle, (
                 "right" if self.next_middle == "left" else "left")
         self.set_pose("hit_left" if side == "left" else "hit_right")
+        if self.sound_on:
+            play_drum(side)
         self.paw_timer.start()
         self.sleep_timer.start()  # restart the 10-second countdown
         self.update()  # redraw the count
@@ -162,10 +199,19 @@ class Pet(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton and self.drag_offset is not None:
             self.drag_offset = None
-            save_position(self.pos())
+            self.save()
+
+    def toggle_sound(self, on):
+        self.sound_on = on
+        self.save()
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
+        sound = menu.addAction("Sound")
+        sound.setCheckable(True)
+        sound.setChecked(self.sound_on)
+        sound.toggled.connect(self.toggle_sound)
+        menu.addSeparator()
         menu.addAction("Quit", QApplication.quit)
         menu.exec(event.globalPos())
 
