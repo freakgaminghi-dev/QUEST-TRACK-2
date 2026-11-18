@@ -16,6 +16,7 @@ PET_SIZE = 250  # px
 MARGIN = 16     # gap from the screen edge
 PAW_DOWN_MS = 150  # how long a paw stays on the drum
 BUBBLE_H = 34      # height of the count bubble under COCO
+SLEEP_AFTER_MS = 10_000  # no typing for 10 seconds -> COCO dozes off
 
 # where the pictures are (works for "python coco_pet.py" and for the bundled .exe)
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -112,6 +113,10 @@ class Pet(QWidget):
         self.paw_timer = QTimer(self, singleShot=True, interval=PAW_DOWN_MS)
         self.paw_timer.timeout.connect(lambda: self.set_pose("up"))
 
+        self.sleep_timer = QTimer(self, singleShot=True, interval=SLEEP_AFTER_MS)
+        self.sleep_timer.timeout.connect(lambda: self.set_pose("sleep"))
+        self.sleep_timer.start()
+
         self.setFixedSize(PET_SIZE, PET_SIZE + BUBBLE_H)
         saved = load_position()
         if saved is not None and self.fits_on_a_screen(saved):
@@ -137,6 +142,7 @@ class Pet(QWidget):
                 "right" if self.next_middle == "left" else "left")
         self.set_pose("hit_left" if side == "left" else "hit_right")
         self.paw_timer.start()
+        self.sleep_timer.start()  # restart the 10-second countdown
         self.update()  # redraw the count
 
     def set_pose(self, pose):
