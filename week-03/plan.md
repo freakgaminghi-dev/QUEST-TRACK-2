@@ -138,6 +138,7 @@ What changed from the plan while building:
 - **Commit:** "Step 9: final check"
 
 ## What not to do
+- Never save or send which keys were pressed. Only count how many times.
 - Never save, show, print or send which keys were pressed. Only the side (left/right) is used, and only the count is shown.
 - No internet use at all.
 - Don't start COCO automatically when Windows starts.
