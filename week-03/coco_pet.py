@@ -3,12 +3,13 @@
 Run:  python coco_pet.py
 """
 
+import json
 import os
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QGuiApplication, QPainter, QPixmap
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 PET_SIZE = 250  # px
 MARGIN = 16     # gap from the screen edge
@@ -17,6 +18,28 @@ MARGIN = 16     # gap from the screen edge
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 POSES_DIR = os.path.join(BASE, "art", "poses")
 POSES = ("up", "hit_left", "hit_right", "sleep")
+
+# settings.json sits next to the program and holds ONLY the window position
+APP_DIR = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
+           else os.path.dirname(os.path.abspath(__file__)))
+SETTINGS = os.path.join(APP_DIR, "settings.json")
+
+
+def load_position():
+    try:
+        with open(SETTINGS, encoding="utf-8") as f:
+            data = json.load(f)
+        return QPoint(int(data["x"]), int(data["y"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def save_position(pos):
+    try:
+        with open(SETTINGS, "w", encoding="utf-8") as f:
+            json.dump({"x": pos.x(), "y": pos.y()}, f)
+    except OSError:
+        pass  # can't save? just start in the corner next time
 
 
 class Pet(QWidget):
@@ -34,13 +57,43 @@ class Pet(QWidget):
                                          Qt.SmoothTransformation)
         self.pose = "up"
 
+        self.drag_offset = None
+
         self.setFixedSize(PET_SIZE, PET_SIZE)
-        self.move_to_corner()
+        saved = load_position()
+        if saved is not None and self.fits_on_a_screen(saved):
+            self.move(saved)
+        else:
+            self.move_to_corner()
+
+    def fits_on_a_screen(self, pos):
+        """Don't come back off-screen (e.g. a monitor was unplugged)."""
+        middle = pos + QPoint(self.width() // 2, self.height() // 2)
+        return any(s.availableGeometry().contains(middle) for s in QGuiApplication.screens())
 
     def move_to_corner(self):
         area = QGuiApplication.primaryScreen().availableGeometry()  # without the taskbar
         self.move(area.right() - self.width() - MARGIN + 1,
                   area.bottom() - self.height() - MARGIN + 1)
+
+    # ----- mouse: drag with left button, menu with right button -----
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_offset = event.globalPosition().toPoint() - self.pos()
+
+    def mouseMoveEvent(self, event):
+        if self.drag_offset is not None:
+            self.move(event.globalPosition().toPoint() - self.drag_offset)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.drag_offset is not None:
+            self.drag_offset = None
+            save_position(self.pos())
+
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+        menu.addAction("Quit", QApplication.quit)
+        menu.exec(event.globalPos())
 
     def paintEvent(self, event):
         p = QPainter(self)
